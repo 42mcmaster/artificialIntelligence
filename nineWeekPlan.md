@@ -87,7 +87,7 @@
 - **Save TensorFlow** for an advanced course or later semester
 
 **Pacing Notes**:
-- Google's ML Crash Course is indeed too math-heavy for intro students
+- Google's ML Crash Course is likely too math-heavy for intro students, but we might explore some of the videos and material they have to cherry-pick specific concepts (i.e., neural networks)
 - Focus on understanding concepts and practical application
 - Use visualization tools heavily
 - Emphasize the evaluation and ethics components (often neglected but in your standards)

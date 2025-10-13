@@ -1,4 +1,4 @@
-# Week 1 Lesson 2: Decision Trees - Visual Thinking
+# AI Lesson 02a: Decision Trees - Visual Thinking
 
 ## Learning Objectives
 - Understand what decision trees are and how they work

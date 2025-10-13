@@ -1,4 +1,4 @@
-# Week 1 Team Project: Decision Tree Application
+# AI Lesson 02c Team Project: Decision Tree Application
 
 ## Overview
 

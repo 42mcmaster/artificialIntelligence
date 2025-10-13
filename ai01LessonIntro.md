@@ -1,4 +1,4 @@
-# Week 1 Lesson 1: What is Artificial Intelligence?
+# AI Lesson 01: What is Artificial Intelligence?
 
 ## Learning Objectives
 - Define artificial intelligence and distinguish it from traditional programming
@@ -87,49 +87,84 @@ AI can identify NEW spam it's never seen before
 - Computer follows the rules exactly
 - **Example:** "If temperature > 80°F, recommend shorts"
 - **Good for:** Well-defined problems with clear rules
-- **We'll start here!**
+
+**We'll start here with Decision Trees!**
 
 ### 2. Machine Learning (ML)
-- Computer learns patterns from data
+- Computer learns patterns from data relatively **"simple" patterns**
 - No explicit rules programmed
 - **Example:** AI looks at 1000 weather days and learns when people wore shorts
 - **Good for:** Complex patterns humans can't easily describe
 
 ### 3. Neural Networks / Deep Learning
 - Inspired by human brain structure
-- Learns very complex patterns through many layers
+- Learns **very complex patterns** through many layers
 - **Example:** Recognizing any cat in any photo
 - **Good for:** Very complex tasks like vision and language
 
 ## Visual Comparison
 
-```
-┌─────────────────────────────────────────────────────┐
-│ TRADITIONAL PROGRAMMING                             │
-│                                                     │
-│  Programmer → Writes Rules → Computer Executes     │
-│                                                     │
-│  Example: "If age < 13, deny account"              │
-└─────────────────────────────────────────────────────┘
+# 🧩 Traditional Programming
 
-┌─────────────────────────────────────────────────────┐
-│ RULE-BASED AI (Decision Trees)                      │
-│                                                     │
-│  Programmer → Creates Decision Rules → AI Follows   │
-│                                                     │
-│  Example: "If weather sunny AND temp > 70          │
-│            then recommend beach"                    │
-└─────────────────────────────────────────────────────┘
+**Programmer → Writes Rules → Computer Executes**
 
-┌─────────────────────────────────────────────────────┐
-│ MACHINE LEARNING                                    │
-│                                                     │
-│  Data → AI Discovers Patterns → AI Makes Decisions │
-│                                                     │
-│  Example: AI learns what makes a good movie        │
-│           from your viewing history                │
-└─────────────────────────────────────────────────────┘
-```
+**Example:**
+> If age < 13, deny account
+
+**Key Idea:**
+- Rules are **hard-coded** by the human programmer.
+- The program follows exact instructions, with no learning or adaptation.
+- This is the foundation of most classical software development.
+
+---
+
+# ⚙️ Rule‑Based AI (Expert Systems)
+
+**Human Experts → Encode Knowledge → AI Follows**
+
+**What does "encode knowledge" mean?**  
+It means **manually writing IF/THEN rules** that capture the expert’s understanding of a topic.
+
+**Example:**
+> If patient has fever **AND** cough → possible flu
+
+**Key Idea:**
+- AI does **not learn** from data.
+- All logic is written by humans based on expert domain knowledge.
+- Common in early medical and diagnostic systems (1980s–2000s).
+
+---
+
+# 🤖 Machine Learning (e.g., Decision Trees)
+
+**Data → Algorithm Learns Patterns → AI Makes Decisions**
+
+**What does "learns patterns" mean?**  
+The AI **discovers its own IF/THEN rules** by analyzing examples (in supervised learning, those examples are labeled).
+
+**Example:**
+> Given weather & user activity data, AI learns:  
+> *sunny AND temp > 70 → recommend beach*
+
+**Key Idea:**
+- The model finds the rules **automatically**.
+- It can improve as more data is collected.
+- Decision Trees, Neural Networks, and Logistic Regression all fit here.
+
+---
+
+# 🧠 Quick Comparison
+
+| **Type**                             | **Who Creates Rules?**         | **Learns Automatically?** | **Uses Data?** | **Example System**            |
+|--------------------------------------|--------------------------------|----------------------------|----------------|-------------------------------|
+| **Traditional Programming**          | Human programmer                | ❌                         | ❌             | Form validation on a website |
+| **Rule-Based AI (Expert System)**    | Human experts encode logic      | ❌                         | ❌             | 1980s medical system          |
+| **Machine Learning (e.g., Decision Trees)** | Learns from data via algorithm | ✅                         | ✅             | Netflix or Spotify Recommender |
+
+
+
+---
+
 
 ## When to Use Each Approach
 

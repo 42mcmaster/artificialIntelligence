@@ -1,4 +1,4 @@
-# Week 1 Lesson 3: Coding Decision Trees in Python
+# AI Lesson 02b: Coding Decision Trees in Python
 
 ## Learning Objectives
 - Translate decision tree diagrams into Python code
