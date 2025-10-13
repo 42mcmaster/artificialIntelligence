@@ -54,7 +54,7 @@ Your decision tree program must include:
 
 Choose ONE of the following projects (or propose your own with teacher approval):
 
-### Option 1: College Major Advisor 🎓
+### Option 1: College Major Advisor 
 Help students decide what to study based on their interests and skills.
 
 **Factors to consider:**
@@ -66,7 +66,7 @@ Help students decide what to study based on their interests and skills.
 
 ---
 
-### Option 2: Video Game Recommender 🎮
+### Option 2: Video Game Recommender 
 Recommend games based on player preferences.
 
 **Factors to consider:**
@@ -79,7 +79,7 @@ Recommend games based on player preferences.
 
 ---
 
-### Option 3: Workout Plan Generator 💪
+### Option 3: Workout Plan Generator 
 Create personalized workout recommendations.
 
 **Factors to consider:**
@@ -92,7 +92,7 @@ Create personalized workout recommendations.
 
 ---
 
-### Option 4: Study Strategy Advisor 📚
+### Option 4: Study Strategy Advisor 
 Help students develop effective study plans.
 
 **Factors to consider:**
@@ -105,7 +105,7 @@ Help students develop effective study plans.
 
 ---
 
-### Option 5: Career Path Explorer 💼
+### Option 5: Career Path Explorer 
 Guide students toward potential careers.
 
 **Factors to consider:**
@@ -118,7 +118,7 @@ Guide students toward potential careers.
 
 ---
 
-### Option 6: Recipe Suggester 🍳
+### Option 6: Recipe Suggester 
 Recommend recipes based on available ingredients and preferences.
 
 **Factors to consider:**
@@ -131,7 +131,7 @@ Recommend recipes based on available ingredients and preferences.
 
 ---
 
-### Option 7: Pet Adoption Matcher 🐾
+### Option 7: Pet Adoption Matcher 
 Match people with appropriate pets.
 
 **Factors to consider:**
@@ -144,7 +144,7 @@ Match people with appropriate pets.
 
 ---
 
-### Option 8: Weekend Activity Planner 🎉
+### Option 8: Weekend Activity Planner 
 Suggest activities based on conditions and preferences.
 
 **Factors to consider:**
@@ -157,7 +157,7 @@ Suggest activities based on conditions and preferences.
 
 ---
 
-### Option 9: Phone/Laptop Purchase Advisor 📱💻
+### Option 9: Phone/Laptop Purchase Advisor 
 Help people decide which device to buy.
 
 **Factors to consider:**
@@ -394,106 +394,3 @@ Submit ONE file per team with:
 ✅ **Solution:** Use descriptive names (budget, genre, difficulty)
 
 ---
-
-## Extensions (Optional - Extra Credit)
-
-Want to go beyond the requirements? Try adding:
-
-1. **Input Validation**: Check if inputs are valid before using them
-   ```python
-   age = input("Enter age: ")
-   if not age.isdigit():
-       print("Please enter a number!")
-   ```
-
-2. **Multiple Recommendations**: Instead of one outcome, suggest top 3 options
-   
-3. **Scoring System**: Calculate a score and use it to make recommendations
-   
-4. **Loop to Run Again**: Let users run the program multiple times
-   ```python
-   again = "yes"
-   while again == "yes":
-       # Your decision tree code
-       again = input("\nRun again? (yes/no): ").lower()
-   ```
-
-5. **Save Results**: Write recommendations to a text file
-
----
-
-## Example: Simple Movie Night Advisor
-
-Here's a complete example for reference (yours should be more complex!):
-
-```python
-"""
-Movie Night Advisor
-Team: Example Team
-Helps choose what movie to watch based on mood and time
-"""
-
-print("=" * 50)
-print("🎬 MOVIE NIGHT ADVISOR")
-print("=" * 50)
-print()
-
-# Gather information
-mood = input("What's your mood? (happy/sad/excited): ").lower()
-time = int(input("How much time do you have? (minutes): "))
-alone = input("Watching alone? (yes/no): ").lower()
-
-print()
-print("-" * 50)
-print("RECOMMENDATION:")
-print("-" * 50)
-
-# Decision logic
-if mood == "happy":
-    if time >= 120:
-        print("🎭 Watch: The Grand Budapest Hotel")
-        print("   Reason: Whimsical and fun, worth the time!")
-    else:
-        print("🎪 Watch: Paddington 2")
-        print("   Reason: Feel-good movie under 2 hours")
-elif mood == "sad":
-    if alone == "yes":
-        print("🌟 Watch: The Pursuit of Happyness")
-        print("   Reason: Uplifting story for reflection")
-    else:
-        print("😂 Watch: a comedy special")
-        print("   Reason: Laughter is best with others")
-else:  # excited
-    if time >= 150:
-        print("🎬 Watch: The Dark Knight")
-        print("   Reason: Epic action movie!")
-    else:
-        print("💥 Watch: Mad Max: Fury Road")
-        print("   Reason: Non-stop action, shorter runtime")
-
-print()
-print("=" * 50)
-print("Enjoy your movie! 🍿")
-print("=" * 50)
-```
-
----
-
-## Questions?
-
-Ask your teacher if you need help with:
-- Choosing a project
-- Planning your decision tree logic
-- Debugging your code
-- Creating your flowchart
-- Understanding the requirements
-
-**Remember:** Both team members should understand and be able to explain all parts of the project!
-
----
-
-## Due Date: [Teacher fills in]
-
-**Submission Method:** [Teacher fills in - Google Classroom, email, etc.]
-
-Good luck, and have fun building your AI decision tree! 🌳🤖

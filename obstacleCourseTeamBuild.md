@@ -1,9 +1,13 @@
 ---
 marp: true
 theme: uncover
-class: lead
+class: invert
 paginate: true
-headingDivider: 2
+
+---
+
+Google doc with other info here: https://docs.google.com/document/d/1VNYnb-5AXKS6jvfzCmopZDN-YXYtXfWXCq3HEy_opz0/edit?usp=sharing
+
 ---
 
 # 🕶️ Blindfold Obstacle Course  
@@ -23,7 +27,6 @@ Each team has:
 - 🗣️ **Guide**: Gives verbal navigation
 - 🎤 **Challenge Voice**: Speaks only during challenge checkpoints
 
-🎯 **Rotate roles** each round so everyone participates fully.
 
 ---
 
@@ -31,77 +34,43 @@ Each team has:
 
 **Start → Maze → Checkpoint 1 → Maze → Checkpoint 2 → Maze → Finish**
 
-- Maze built from **chairs, tables, cones, tape**
-- **Touching obstacles = penalty**  
-- **Checkpoints = fun, focused team challenges**
+- Maze built from **chairs & tables**
+- **Touching obstacles = 10 second penalty** 
+- **Checkpoints = focused team challenges** where the walker can only LISTEN to the challenge voice, NO TALKING!
 
 ---
 
 ## ☝️ Rule Summary
 
 - Guide uses **voice only** — no touch or leading
-- Walker is **blindfolded** the entire course
+- Walker is **blindfolded** the entire course and can not speak!
 - Challenge Voice **steps in only at checkpoint tables**
 - If Walker **touches an obstacle**:
-  - Return to the **last checkpoint**
-  - Optional time or point penalty
+  - Return to the **last checkpoint** and wait 10 secs
+---
+
+## Ok, let's make teams!
+
+---
+## Walker's must stay in class facing the corner and can't watch while we set up the course.  
 
 ---
 
 ## ✅ Checkpoint 1: Cup Pyramid
 
-🪜 **Challenge Task**:
-- Blindfolded Walker must **stack 6 cups into a pyramid**:
-  - 3 on bottom → 2 in middle → 1 on top
+guidelines are printed
 
-🎤 Challenge Voice:
-- Describes location, stacking process
-- **Guide stays silent**
-
-🙈 If cups fall: Walker must **reset and try again**
 
 ---
 
 ## ✅ Checkpoint 2: Puzzle Build
 
-🧩 **Challenge Task**:
-- Recreate a **shape or layout** using foam pieces or LEGO bricks
-
-🎤 Challenge Voice:
-- Sees the reference image/model
-- Describes shape to the Walker
-- No touching allowed
-
-🙈 Walker must **feel and build** the correct shape
+guidelines are printed
 
 ---
 
-## 🚦 Touch Penalty Rule
+## Reflection (Post-Game)
 
-If Walker touches a maze obstacle:
-- Return to the **last checkpoint**
-- (Optional) -3 points or 30-second delay
-
-✨ Focus: Careful listening, steady movement
-
----
-
-## 🏁 Scoring (Optional)
-
-| Action | Points |
-|--------|--------|
-| Finish the course | +10 |
-| Each checkpoint complete | +5 |
-| Obstacle touch penalty | -3 |
-| Best teamwork (teacher pick) | +Bonus |
-
-🏆 **You decide** if this is a race or a quality challenge!
-
----
-
-## 🧠 Reflection (Post-Game)
-
-Use these prompts after the activity:
 
 - What role challenged you the most?
 - How did your team adapt under pressure?
@@ -111,25 +80,22 @@ Use these prompts after the activity:
 
 ---
 
-## 🪑 Materials Checklist
+## Materials Checklist
 
-- Blindfolds ×5  
-- Plastic cups ×12 (Checkpoint 1)  
+- Blindfold  
+- Plastic cups (Checkpoint 1)  
 - Puzzle/LEGO kits ×2 (Checkpoint 2)  
-- Maze obstacles: chairs, desks, cones, tape  
-- Reference model/pictures for puzzles  
+- Maze obstacles: chairs, desks, tape   
 - Painter’s tape for start, checkpoints, and finish lines  
 
 ---
 
-## 🎉 Final Thoughts
+## Final Thoughts
 
 This activity builds:
 - 🔊 Communication
 - 🎯 Focus under pressure
 - 🧠 Problem-solving
 - 💪 Trust & teamwork
-
-Great for non-tech critical thinking days!
 
 ---
