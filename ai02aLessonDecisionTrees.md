@@ -17,9 +17,11 @@ Do you have a fever?
 ├─ YES → Is your throat sore?
 │        ├─ YES → Probably strep throat
 │        └─ NO → Probably flu
-└─ NO → Is there a rash?
-         ├─ YES → Probably allergic reaction
-         └─ NO → Probably just tired
+└─ NO → Are you coughing?
+         ├─ YES → Probably common cold
+         └─ NO → Do you have a rash?
+                  ├─ YES → Probably allergic reaction
+                  └─ NO → Probably just tired
 ```
 
 ## Anatomy of a Decision Tree
