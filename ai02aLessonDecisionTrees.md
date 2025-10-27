@@ -7,6 +7,12 @@
 - Trace through decision paths manually
 - Recognize when decision trees are the right tool
 
+## What's the Point of This Lesson?
+
+Here's the thing: decision trees ARE artificial intelligence — and they're everywhere. Netflix recommendations, spam filters, fraud detection, medical diagnosis apps, and even self-driving car braking systems all use decision tree AI. They're the foundation of machine learning because they're fast, transparent, and actually work better than fancy neural networks for many real-world problems. Once you understand how decision trees make decisions, you understand the core concept behind ALL AI.
+
+## Although this isn't "AI" yet, we'll train AI using data in our upcoming lessons - the first attempts at machine learning!
+
 ## What is a Decision Tree?
 
 A **decision tree** is a flowchart-like structure that helps make decisions by asking yes/no questions.
@@ -65,7 +71,7 @@ Let's build a decision tree for choosing whether to wear a jacket:
          │         │                   │
          │        YES                 NO
          │         │                   │
-    Wear jacket   │              No jacket needed
+    Wear jacket    │              No jacket needed
               Wear jacket
 ```
 
@@ -325,20 +331,9 @@ Make sure you understand these terms:
 - **Leaf node:** Final answer/outcome
 - **Depth:** How many questions before reaching an answer
 
-## Next Lesson Preview
-
-Now that you understand decision trees visually, we'll **code them in Python**!
-
-You'll build:
-1. Simple jacket recommendation system
-2. Movie rating checker
-3. Your own custom decision tree
-
-Get ready to turn these diagrams into working programs! 🐍
-
 ## Practice
 
-On paper, create a decision tree for:
+Two volunteers come up to the board and the class will help us build a tree that answers: 
 
 **"Should I do homework now or later?"**
 
@@ -349,7 +344,3 @@ Factors to consider:
 - Am I tired?
 
 Make it at least 3 levels deep!
-
----
-
-**Think About:** Can you draw a decision tree for something you do automatically? Like deciding what to wear or what to eat? Try it!

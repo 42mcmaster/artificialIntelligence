@@ -31,6 +31,13 @@ Let's code it!
 
 ## Example 1: Simple Jacket Advisor
 
+## `I Need Two Volunteers` to write the python code for the tree above (movie rating) on the smart board.
+
+`While the volunteers are writing the code on the board, the rest of you copy it into IDLE or VS Code and test it.` 
+
+
+
+
 ### Version 1: Basic Structure
 
 ```python
@@ -40,32 +47,32 @@ temperature = int(input("What's the temperature (°F)? "))
 
 # Make decision
 if raining == "yes":
-    print("🧥 Wear a jacket (it's raining!)")
+    print("Wear a jacket (it's raining!)")
 elif temperature < 60:
-    print("🧥 Wear a jacket (it's cold!)")
+    print("Wear a jacket (it's cold!)")
 else:
-    print("☀️ No jacket needed!")
+    print("No jacket needed!")
 ```
 
 **Sample Run 1:**
 ```
 Is it raining? (yes/no): yes
 What's the temperature (°F)? 75
-🧥 Wear a jacket (it's raining!)
+Wear a jacket (it's raining!)
 ```
 
 **Sample Run 2:**
 ```
 Is it raining? (yes/no): no
 What's the temperature (°F)? 45
-🧥 Wear a jacket (it's cold!)
+Wear a jacket (it's cold!)
 ```
 
 **Sample Run 3:**
 ```
 Is it raining? (yes/no): no
 What's the temperature (°F)? 72
-☀️ No jacket needed!
+No jacket needed!
 ```
 
 ### Key Pattern: Input → Decision → Output
@@ -111,6 +118,13 @@ YES    NO
 │       │
 OK   Not OK
 ```
+
+---
+
+## `I Need Two Volunteers` to write the python code for the tree above (movie rating) on the smart board.
+
+`While the volunteers are writing the code on the board, the rest of you copy it into IDLE or VS Code and test it.` 
+
 
 ### The Code
 
@@ -390,40 +404,6 @@ else:
     print("❌ Cannot drive yet")
 ```
 
-## Practice Makes Perfect
-
-Try building small decision trees to practice:
-
-**Practice 1: Simple Breakfast Advisor**
-```python
-hungry = input("Are you very hungry? (yes/no): ").lower()
-time = int(input("Minutes available: "))
-
-if hungry == "yes":
-    if time >= 15:
-        print("🍳 Full breakfast: eggs and toast")
-    else:
-        print("🥐 Quick: grab a bagel")
-else:
-    if time >= 10:
-        print("🥣 Light: cereal")
-    else:
-        print("🍎 Fastest: piece of fruit")
-```
-
-**Practice 2: Phone Upgrade Advisor**
-```python
-current_age = int(input("Age of current phone (years): "))
-battery_ok = input("Battery still good? (yes/no): ").lower()
-
-if current_age >= 3:
-    print("📱 Consider upgrading - phone is old")
-elif battery_ok == "no":
-    print("🔋 Replace battery or upgrade")
-else:
-    print("✅ Keep your current phone")
-```
-
 ## Debugging Decision Trees
 
 ### Common Mistakes
@@ -503,34 +483,4 @@ Test 3: Path to Outcome 3
 - **Input validation:** Checking if user input is valid before using it
 - **Logic error:** Code runs but gives wrong results
 
-## Challenge Problems
-
-Try these for extra practice:
-
-**Challenge 1:** Add a third factor (wind speed) to the jacket advisor
-
-**Challenge 2:** Create a grade calculator that considers:
-- Test score
-- Homework completion
-- Extra credit
-
-**Challenge 3:** Build a "Should I buy this?" advisor that considers:
-- Price
-- How much money you have
-- Do you need it vs. want it
-- Is it on sale
-
-## Next Week Preview
-
-**Week 2: Databases**
-
-We'll learn how to:
-- Store decision tree results
-- Load data to make decisions
-- Track patterns over time
-
-Decision trees become MUCH more powerful when combined with stored data!
-
 ---
-
-**Wrap Up:** You've now built AI decision-making systems! These are the foundation for more complex AI. Next, we'll add databases to make our AI remember things! 🧠
