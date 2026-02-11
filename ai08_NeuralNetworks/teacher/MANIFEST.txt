@@ -1,0 +1,142 @@
+LESSON 08: NEURAL NETWORKS - FILE MANIFEST
+===========================================
+
+Created: February 11, 2026
+For: Ryan McMaster, CTE Instructor
+Course: Applications of Artificial Intelligence (ODE 145130)
+Students: High school CTE, ai01-ai07 completed
+
+TOTAL: 13 FILES | 3200+ LINES | 160K CONTENT
+
+File Listing and Descriptions:
+==============================
+
+1. README.md
+   - Complete teacher guide and lesson plan
+   - Learning objectives, competencies, 4-day flow
+   - Code standards, assessment ideas, troubleshooting
+   - ESSENTIAL: Read this first!
+
+PRESENTATION & STUDY MATERIALS:
+   2. ai08_Slides.md
+      - 10 MARP slides for classroom presentation
+      - Topics: neurons, weights, layers, training, AI bias
+      - ASCII diagrams, comparison tables
+      - 20 min presentation time
+
+   3. ai08_StudyGuide.md
+      - 20 vocabulary terms with definitions
+      - Quick reference guide for sklearn
+      - Comparison chart of all ML models
+      - Review questions with answers
+      - Student study resource
+
+WALKTHROUGH (Main Lesson Content):
+   4. ai08_Walkthrough.ipynb (STUDENT VERSION)
+      - Step-by-step walkthrough with blanks
+      - Sub-Lesson 08a: How NNs Work (theory)
+      - Sub-Lesson 08b: NNs in Python (coding)
+      - Heavy comments, camelCase variables
+      - Use in class: code together with students
+
+   5. ai08_Walkthrough_Solutions.ipynb (INSTRUCTOR)
+      - Complete working version of walkthrough
+      - All code filled in
+      - Instructor notes throughout
+      - Shows key insight: Linear Regression often matches NN!
+
+DAY 2 ACTIVITY - TensorFlow Playground:
+   6. ai08a_Task.ipynb (STUDENT VERSION)
+      - 6 structured TensorFlow Playground experiments
+      - Circle (simple) vs Spiral (complex) datasets
+      - Observation blanks for student responses
+      - Summary analysis questions
+      - Hands-on discovery of depth/width effects
+
+   7. ai08a_Task_Solutions.ipynb (INSTRUCTOR)
+      - Complete answers to all experiments
+      - Detailed explanations and teaching notes
+      - Expected student observations
+      - Teaching points about model capacity
+
+DAY 3 ACTIVITY - Architecture Exploration:
+   8. ai08b_Task.ipynb (STUDENT VERSION)
+      - Build 5 different architectures on weather data
+      - Blank cells for student code
+      - Architectures: (5,), (10,5), (20,), (15,10,5), student choice
+      - Comparison table generation
+      - Analysis: Why simpler often wins
+
+   9. ai08b_Task_Solutions.ipynb (INSTRUCTOR)
+      - Complete working solutions for all 5 models
+      - Results show similar performance
+      - Teaching note: Simpler is better for this problem
+      - Bonus comparison to Linear Regression
+
+DAY 4 ACTIVITY - Model Comparison:
+   10. ai08_DIYTask.ipynb (STUDENT VERSION)
+       - Build 3 models: Linear Regression, Random Forest, Neural Network
+       - Same dataset: weather data (predicting temp_max)
+       - Blank cells for student code
+       - Comparison table and analysis report
+       - Which model to deploy in production?
+
+   11. ai08_DIYTask_Solutions.ipynb (INSTRUCTOR)
+       - Complete code for all 3 models
+       - Expected results and analysis
+       - Key lesson: Model selection depends on the problem
+       - Shows when to use each approach
+
+ASSESSMENT MATERIALS:
+   12. ai08_Gimkit.csv
+       - 25 review questions for Gimkit game
+       - Format: Question, Correct Answer, 3 Wrong Answers
+       - Topics: neurons, weights, scaling, training, layers
+       - Import to Gimkit.com for interactive review
+
+   13. ai08_GoogleQuiz.csv
+       - 30 assessment questions for Google Forms/Quiz
+       - Format: Question, Options A-D, Answer, Points
+       - Ready to import to Google Forms
+       - Comprehensive coverage of content
+
+DATA USED:
+==========
+All notebooks reference: medina_weather_2024.csv
+- 365 days of 2024 weather for Medina County
+- Predicting: temp_max from temp_min, humidity, wind_speed
+- Same data as Lesson 07 (Linear Regression) for comparison
+
+KEY TEACHING INSIGHTS:
+======================
+1. Simpler models often beat complex ones
+2. Scaling is not optional for neural networks
+3. Deep networks for complex patterns, shallow for simple
+4. Model selection depends on the problem
+5. Always compare multiple models fairly
+
+QUICK START:
+============
+1. Read README.md (complete lesson plan)
+2. Review ai08_Slides.md (know what you'll present)
+3. Run ai08_Walkthrough_Solutions.ipynb (verify environment)
+4. Print ai08_StudyGuide.md for students
+5. Assign ai08_Walkthrough.ipynb for Day 1
+
+STANDARDS COMPLIANCE:
+====================
+✓ ODE 2.14.1 - ML vs NN vs decision trees
+✓ ODE 2.14.5 - Apply ML to real problems
+✓ ODE 5.1.1 - Python data analysis
+✓ ODE 5.1.2 - scikit-learn algorithms
+
+CODE QUALITY:
+=============
+✓ Heavy comments on every import and line
+✓ camelCase variables throughout
+✓ Clear markdown section headers
+✓ Consistent formatting
+✓ "Your code here" blanks in student versions
+✓ Instructor notes in solution versions
+
+All files ready for classroom deployment!
