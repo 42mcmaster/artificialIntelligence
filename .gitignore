@@ -49,7 +49,7 @@ Thumbs.db
 *.tmp
 
 # Solution folders
-/teacher
+teacher/
 
 
 # Excel and CSV files
