@@ -4,13 +4,13 @@ theme: default
 paginate: true
 ---
 
-# Lesson 09: AI Ethics & Data Privacy
+# Lesson 08: AI Ethics & Data Privacy
 ## Artificial Intelligence
 ### Medina County Career Center
 
 ---
 
-<!-- _header: "Sub-Lesson 09a — AI Ethics & Bias" -->
+<!-- _header: "Sub-Lesson 08a — AI Ethics & Bias" -->
 
 # AI Ethics & Bias
 
@@ -27,7 +27,7 @@ paginate: true
 
 ---
 
-<!-- _header: "Sub-Lesson 09a — AI Ethics & Bias" -->
+<!-- _header: "Sub-Lesson 08a — AI Ethics & Bias" -->
 
 # Ethical Frameworks for AI
 
@@ -46,7 +46,7 @@ paginate: true
 
 ---
 
-<!-- _header: "Sub-Lesson 09a — AI Ethics & Bias" -->
+<!-- _header: "Sub-Lesson 08a — AI Ethics & Bias" -->
 
 # AI's Role in Society
 
@@ -60,7 +60,7 @@ paginate: true
 
 ---
 
-<!-- _header: "Sub-Lesson 09b — Data Privacy Laws" -->
+<!-- _header: "Sub-Lesson 08b — Data Privacy Laws" -->
 
 # Data Privacy Laws Overview
 
@@ -73,7 +73,7 @@ paginate: true
 
 ---
 
-<!-- _header: "Sub-Lesson 09b — Data Privacy Laws" -->
+<!-- _header: "Sub-Lesson 08b — Data Privacy Laws" -->
 
 # Key Privacy Concepts
 
@@ -94,7 +94,7 @@ paginate: true
 
 ---
 
-<!-- _header: "Sub-Lesson 09b — Data Privacy Laws" -->
+<!-- _header: "Sub-Lesson 08b — Data Privacy Laws" -->
 
 # Privacy Laws & AI Systems
 

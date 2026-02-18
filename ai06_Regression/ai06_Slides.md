@@ -4,13 +4,13 @@ theme: default
 paginate: true
 ---
 
-# Lesson 07: Linear Regression
+# Lesson 06: Linear Regression
 ## Artificial Intelligence
 ### Medina County Career Center
 
 ---
 
-<!-- _header: "Sub-Lesson 07a — Correlation & Pearson r" -->
+<!-- _header: "Sub-Lesson 06a — Correlation & Pearson r" -->
 
 # Measuring Relationships: Pearson r
 
@@ -28,7 +28,7 @@ paginate: true
 
 ---
 
-<!-- _header: "Sub-Lesson 07a — Correlation & Pearson r" -->
+<!-- _header: "Sub-Lesson 06a — Correlation & Pearson r" -->
 
 # From r to R-Squared (R²)
 
@@ -48,7 +48,7 @@ R² tells us: **what percentage of the outcome is explained by our predictor?**
 
 ---
 
-<!-- _header: "Sub-Lesson 07b — Building Regression Models in Python" -->
+<!-- _header: "Sub-Lesson 06b — Building Regression Models in Python" -->
 
 # Linear Regression: The Algebra
 
@@ -65,7 +65,7 @@ From algebra: **y = mx + b**
 
 ---
 
-<!-- _header: "Sub-Lesson 07b — Building Regression Models in Python" -->
+<!-- _header: "Sub-Lesson 06b — Building Regression Models in Python" -->
 
 # The Regression Pipeline
 
@@ -87,7 +87,7 @@ From algebra: **y = mx + b**
 
 ---
 
-<!-- _header: "Sub-Lesson 07b — Building Regression Models in Python" -->
+<!-- _header: "Sub-Lesson 06b — Building Regression Models in Python" -->
 
 # Coefficients: What the Model Learns
 
@@ -112,7 +112,7 @@ Predicted Temp = (1.03 × morning_low) + (-0.26 × humidity) + intercept
 
 ---
 
-<!-- _header: "Sub-Lesson 07b — Building Regression Models in Python" -->
+<!-- _header: "Sub-Lesson 06b — Building Regression Models in Python" -->
 
 # When Lines Work vs Don't Work
 
@@ -133,7 +133,7 @@ When lines fail, we switch to random forests, neural networks, clustering, or ot
 
 ---
 
-<!-- _header: "Sub-Lesson 07b — Building Regression Models in Python" -->
+<!-- _header: "Sub-Lesson 06b — Building Regression Models in Python" -->
 
 # Key Takeaways
 

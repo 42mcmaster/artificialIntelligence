@@ -4,7 +4,7 @@ theme: default
 paginate: true
 ---
 
-# Lesson 08: Neural Networks
+# Lesson 07: Neural Networks
 ## Artificial Intelligence
 ### Medina County Career Center
 
@@ -151,8 +151,8 @@ Neural networks learn from data. **Biased data = Biased AI.**
 # Let's Build a Neural Network!
 
 **Today's Task:**
-1. Sub-Lesson 08a: Understand how neural networks work (TensorFlow Playground)
-2. Sub-Lesson 08b: Build a neural network in Python
+1. Sub-Lesson 07a: Understand how neural networks work (TensorFlow Playground)
+2. Sub-Lesson 07b: Build a neural network in Python
 3. Compare to Linear Regression on same weather data
 
 **Next:** Experiments with different architectures!

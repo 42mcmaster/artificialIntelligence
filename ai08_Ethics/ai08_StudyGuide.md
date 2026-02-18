@@ -1,4 +1,4 @@
-# Lesson 09: AI Ethics & Data Privacy — Study Guide
+# Lesson 08: AI Ethics & Data Privacy — Study Guide
 
 ## Vocabulary (~22 terms)
 

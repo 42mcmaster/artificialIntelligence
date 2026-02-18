@@ -1,42 +1,73 @@
-# Study Guide: Lesson 07 — Linear Regression
+# Study Guide: Lesson 06 — Linear Regression
 
-## Vocabulary
+## Vocabulary (Plain English)
 
-1. **Linear Regression** — A machine learning algorithm that draws the "best fit" line through data points and uses that line to make predictions.
+1. **Linear Regression** — A machine learning algorithm that draws the "best fit" line through data points and uses that line to make predictions. Think of it like drawing a trend line through a scatter plot — the computer just does it way more precisely than you could by hand.
 
-2. **Pearson r (Correlation)** — A number from -1.0 to +1.0 that measures how strongly two variables are related. Closer to ±1 = stronger relationship.
+2. **Feature** — An input variable you give the model so it can make a prediction. These are the things you *know* ahead of time. Example: if you're predicting salary, your features might be education level and years of experience.
 
-3. **R-Squared (R²)** — The square of Pearson r; represents the percentage of variation in the output that the input explains. Higher R² = better fit.
+3. **Target** — The output variable you're trying to predict. This is the thing you *want to know*. Example: salary, test score, house price.
 
-4. **Coefficient** — A number that the model learns, representing how much each feature affects the prediction. Positive = pushes prediction up, negative = pushes down.
+4. **Pearson r (Correlation)** — A number from -1.0 to +1.0 that measures how strongly two variables are connected.
+   - **+1.0** = they move perfectly together (one goes up, the other always goes up)
+   - **0.0** = no connection at all
+   - **-1.0** = they move perfectly opposite (one goes up, the other always goes down)
 
-5. **Intercept** — The starting value in the regression formula y = mx + b (the "b" part). It's the prediction when all features equal zero.
+   Example: Height and shoe size have a Pearson r around +0.95 — taller people almost always have bigger feet.
 
-6. **Feature** — An input variable used to make a prediction (e.g., engine size, temperature, humidity).
+5. **R² (R-Squared)** — A score from 0 to 1 that tells you how well your model's features predict the target. Think of it as a percentage grade for your model.
 
-7. **Target** — The output variable we're trying to predict (e.g., MPG, price, temperature).
+   **Simple way to think about it:** If R² = 0.60, your model's features explain 60% of *why the target values are different from each other*. The other 40% is caused by things your model doesn't know about.
 
-8. **Train/Test Split** — Dividing the dataset into two parts: 80% for training the model, 20% for testing its accuracy on data it hasn't seen.
+   **Example:** You build a model to predict salary using education level. R² = 0.42. That means education level explains 42% of why some jobs pay more than others. The remaining 58%? That's stuff like the industry, location, demand, and other things your model can't see.
 
-9. **MAE (Mean Absolute Error)** — The average number of units the model's predictions are off by. Lower is better.
+   | R² Score | What it means |
+   |----------|--------------|
+   | 0.90+ | Excellent — model predicts almost perfectly |
+   | 0.70–0.89 | Good — model catches most of the pattern |
+   | 0.50–0.69 | Decent — model helps but misses a lot |
+   | Below 0.50 | Weak — features don't explain much |
 
-10. **Slope (m)** — In y = mx + b, the "m" is the slope; it shows how steeply the line goes up or down.
+6. **MAE (Mean Absolute Error)** — The average amount the model's predictions are off by. Lower is better.
 
-11. **Scatter Plot** — A graph with points plotted as (x, y) pairs; used to visualize the relationship between two variables.
+   Example: If MAE = $18,000 for a salary prediction model, that means on average, the model's guess is about $18,000 too high or too low. Whether that's "good" depends on context — $18K off on a $200K salary is decent; $18K off on a $35K salary is bad.
 
-12. **Overfitting** — When a model memorizes the training data perfectly but fails on new data because it learned the noise, not the true pattern.
+7. **Coefficient** — A number the model learns that tells you how much each feature affects the prediction.
+   - **Positive coefficient** = when this feature goes up, the prediction goes up
+   - **Negative coefficient** = when this feature goes up, the prediction goes down
 
-13. **Residual** — The difference between what the model predicted and what actually happened. Small residuals = good fit.
+   Example: If the Education_Level coefficient is +11,434, that means each step up on the education scale adds about $11,434 to the predicted salary.
 
-14. **Positive Correlation** — When two variables move in the same direction (both go up, or both go down together).
+8. **Intercept** — The starting point of the prediction when all features are zero. It's the "b" in y = mx + b from algebra.
 
-15. **Negative Correlation** — When two variables move in opposite directions (one goes up, the other goes down).
+9. **Train/Test Split** — Dividing your data into two groups: one to teach the model (training set, usually 80%) and one to quiz the model on data it hasn't seen (test set, usually 20%). This tells you if the model actually learned patterns or just memorized answers.
 
-16. **Heatmap** — A color-coded table showing the correlation (Pearson r) between every pair of variables.
+10. **Overfitting** — When a model memorizes the training data too well and then fails on new data. Like a student who memorizes practice test answers word-for-word but can't handle slightly different questions on the real exam.
 
-17. **One-Hot Encoding** — Converting categorical data (like "FWD", "RWD") into separate 0/1 columns so the model can work with it.
+11. **Scatter Plot** — A graph where each data point is a dot plotted by its (x, y) values. Used to visually see if two variables have a relationship.
 
-18. **API** — Application Programming Interface; a way for programs to request data from online sources.
+12. **Heatmap** — A color-coded grid that shows the Pearson r correlation between every pair of variables at once. Red/blue colors show strong relationships; white/pale shows weak ones.
+
+13. **Positive Correlation** — When two variables move in the same direction. As one goes up, the other goes up too. Example: education level and salary.
+
+14. **Negative Correlation** — When two variables move in opposite directions. As one goes up, the other goes down. Example: car engine size and fuel economy (bigger engines = fewer MPG).
+
+---
+
+## Data Dictionary: BLS Occupation Wages
+
+The `BLS_Occupation_Wages.csv` file contains data on 826 U.S. occupations from the Bureau of Labor Statistics.
+
+| Column | Type | Description | Example |
+|--------|------|-------------|---------|
+| **Occupation** | text | Job title | "Registered nurses" |
+| **Education_Level** | number | Typical education (1=none, 2=HS, 5=Associate's, 6=Bachelor's, 8=Doctoral) | 6 |
+| **Experience_Required** | number | Work experience needed (1=None, 2=<5 years, 3=5+ years) | 2 |
+| **Training_Required** | number | On-the-job training (1=None, 6=Internship/residency) | 1 |
+| **Workers_Thousands** | number | People employed in thousands | 3,175.8 |
+| **Growth_Rate_Pct** | number | Projected growth 2024–2034 | 6.0 |
+| **Annual_Openings_Thousands** | number | Yearly job openings in thousands | 193.1 |
+| **Median_Annual_Wage** | number | Median salary in dollars (2024) | 86,070 |
 
 ---
 
@@ -55,74 +86,47 @@ The `medina_weather_2024.csv` file contains daily weather measurements for Medin
 
 ---
 
-## Data Dictionary: EPA Cars 2026
-
-The `MY26 FE Guide for DOE.xlsx` file contains real EPA fuel economy data for 2026 model year vehicles.
-
-| Column | Type | Description | Example |
-|--------|------|-------------|---------|
-| **engine_liters** | number | Engine displacement in liters | 2.0 |
-| **cylinders** | integer | Number of engine cylinders | 4 |
-| **drive** | string | Drive type (F=FWD, R=RWD, A=AWD, 4=4WD) | "F" |
-| **mpg** | number | Combined fuel economy in miles per gallon | 28.5 |
-
----
-
 ## Quick Reference: Regression in Python
 
-### 1. Load and Clean Data
+### 1. Load and Explore Data
 ```python
 import pandas as pd
 
-# Load data
 data = pd.read_csv('file.csv')
-
-# Remove rows with missing values
 data = data.dropna()
 
-# Check what you have
 print(data.head())
 print(data.describe())
 ```
 
-### 2. Explore Correlations
+### 2. Check Correlations
 ```python
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Calculate Pearson r for all numeric columns
 correlation = data[['feature1', 'feature2', 'target']].corr()
 
-# Visualize as a heatmap
 plt.figure(figsize=(8, 6))
 sns.heatmap(correlation, annot=True, cmap='coolwarm', center=0, fmt='.2f')
 plt.show()
-
-# Check one specific correlation
-r_value = data['feature1'].corr(data['feature2'])
-r_squared = r_value ** 2
 ```
 
-### 3. Build a Regression Model
+### 3. Build the Model
 ```python
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_absolute_error
 
-# Define features (X) and target (y)
 X = data[['feature1', 'feature2']]
 y = data['target']
 
-# Train/test split: 80% train, 20% test
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# Create and train the model
 model = LinearRegression()
 model.fit(X_train, y_train)
 
-# Check accuracy on test data
 predictions = model.predict(X_test)
 r2 = r2_score(y_test, predictions)
 mae = mean_absolute_error(y_test, predictions)
@@ -133,7 +137,6 @@ print(f"MAE: {mae:.1f}")
 
 ### 4. Interpret Coefficients
 ```python
-# See what the model learned
 coefficients = pd.DataFrame({
     'Feature': X.columns,
     'Coefficient': model.coef_
@@ -142,18 +145,16 @@ print(coefficients)
 print(f"Intercept: {model.intercept_:.2f}")
 
 # The formula is:
-# y = (coef[0] * feature1) + (coef[1] * feature2) + ... + intercept
+# predicted target = (coef1 × feature1) + (coef2 × feature2) + intercept
 ```
 
-### 5. Make Predictions
+### 5. Make a Prediction
 ```python
-# Create a row of new data
 new_input = pd.DataFrame({
     'feature1': [value1],
     'feature2': [value2]
 })
 
-# Get the prediction
 prediction = model.predict(new_input)[0]
 print(f"Predicted value: {prediction:.1f}")
 ```
@@ -163,41 +164,22 @@ print(f"Predicted value: {prediction:.1f}")
 ## ODE Competencies Covered
 
 **2.14.1** — Demonstrate proficiency with data visualization and statistical analysis tools to interpret and communicate findings.
-- We use correlation heatmaps, scatter plots, and metrics like R² to analyze relationships.
 
 **5.1.2** — Apply machine learning algorithms to solve real-world problems.
-- We train linear regression models on actual weather and car data.
 
 **1.1.7** — Evaluate AI solutions for effectiveness, bias, and ethical implications.
-- We discuss why the weather model is "cheating" and compare realistic vs simplified predictions.
 
 ---
 
 ## Common Mistakes to Avoid
 
-1. **Using R² from the training data** — Always check R² on test data (data the model hasn't seen). Training R² is always higher and can hide overfitting.
+1. **Using R² from the training data** — Always check R² on test data. Training R² is always higher and can hide overfitting.
 
-2. **Assuming correlation = causation** — Just because two things are correlated doesn't mean one causes the other. Example: ice cream sales and drowning deaths are correlated (both peak in summer), but ice cream doesn't cause drowning.
+2. **Assuming correlation = causation** — Just because two things are correlated doesn't mean one causes the other. Ice cream sales and drowning deaths are correlated (both peak in summer), but ice cream doesn't cause drowning.
 
-3. **Ignoring missing values** — Always check for NaN/null values and handle them (usually with `.dropna()` or `.fillna()`).
+3. **Using features that "cheat"** — If your feature is just another version of your target (like using City_MPG to predict Combined_MPG), the model isn't learning anything useful.
 
-4. **Forgetting to convert categorical data** — If you have text columns like "FWD", "RWD", use one-hot encoding before building the model.
-
-5. **Trusting low R² too quickly** — R² below 0.50 isn't necessarily bad; it just means the relationship is weaker. Many real-world problems have low R².
-
----
-
-## Excel Warmup Review
-
-In ai06, you calculated Pearson r for three datasets:
-
-| Dataset | r value | Interpretation |
-|---------|---------|-----------------|
-| Height vs Shoe Size | ~0.997 | Nearly perfect positive |
-| Study Hours vs Test Score | ~0.972 | Very strong positive |
-| Ice Cream Sales vs Temperature | ~0.992 | Very strong positive |
-
-**Key insight:** All three had strong positive correlations, but the study hours dataset had more "scatter" — some students who studied the same amount got different scores. That's real data.
+4. **Ignoring missing values** — Always check for NaN/null values and handle them before building a model.
 
 ---
 
@@ -205,14 +187,14 @@ In ai06, you calculated Pearson r for three datasets:
 
 **Good fit:**
 - You have 50+ data points
-- Pearson r > 0.70 or < -0.70
-- Relationship is roughly straight-line
-- You need an interpretable model (you can explain the formula to others)
+- Relationship looks roughly like a straight line
+- R² is above 0.50
+- You want a model you can explain to someone
 
 **Bad fit:**
-- Pearson r between -0.4 and +0.4 (weak relationship)
 - Relationship is curved
-- You have categorical outcomes (yes/no, A/B/C)
-- You need maximum accuracy (then try neural networks)
+- R² below 0.30
+- You need maximum accuracy (try neural networks instead)
+- Your target is a category (yes/no) rather than a number
 
 ---

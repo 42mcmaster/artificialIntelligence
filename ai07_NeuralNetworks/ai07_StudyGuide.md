@@ -1,4 +1,4 @@
-# Lesson 08: Neural Networks - Study Guide
+# Lesson 07: Neural Networks - Study Guide
 
 ## Vocabulary
 
