@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model Comparison — 4 Algorithms, 1 House</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0B1120; color: #F8FAFC; }
+  input[type="range"] { -webkit-appearance: none; appearance: none; height: 8px; border-radius: 4px; outline: none; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #F97316; border: 2px solid #0B1120; cursor: pointer; }
+  .card { background: #1A2744; border-radius: 12px; padding: 16px; }
+  .mono { font-family: 'Consolas', 'Monaco', monospace; }
+  .explain { font-size: 13px; color: #CBD5E1; line-height: 1.6; margin-bottom: 14px; }
+  .explain strong { color: #F8FAFC; }
+  .callout { background: #1A2744; border-left: 3px solid #F97316; border-radius: 0 8px 8px 0; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: #CBD5E1; line-height: 1.5; }
+  .callout strong { color: #F8FAFC; }
+  canvas { border-radius: 8px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useRef, useEffect } = React;
+
+// ═══ LINEAR REGRESSION ═══
+const LR_COEFS = { sqft: 125, beds: 15000, baths: 22000, year: 1200, intercept: -2150000 };
+function lrPredict(f) {
+  return LR_COEFS.sqft * f.sqft + LR_COEFS.beds * f.beds + LR_COEFS.baths * f.baths + LR_COEFS.year * f.year + LR_COEFS.intercept;
+}
+
+// ═══ DECISION TREE ═══
+function dtPredict(f) {
+  if (f.sqft > 1600) {
+    if (f.year > 1985) {
+      if (f.baths > 2) return 420000;
+      if (f.beds > 3) return 365000;
+      return 310000;
+    }
+    return f.beds > 3 ? 275000 : 220000;
+  }
+  if (f.beds > 2) return f.year > 1990 ? 245000 : 185000;
+  return f.baths > 1 ? 165000 : 120000;
+}
+
+// ═══ RANDOM FOREST (5 trees) ═══
+const rfTrees = [
+  (f) => { if (f.sqft>1700) { if (f.year>1990) return f.baths>2?415000:(f.beds>3?355000:305000); return f.beds>3?268000:215000; } if (f.beds>2) return f.year>1985?240000:178000; return f.baths>1?158000:115000; },
+  (f) => { if (f.year>1995) { if (f.sqft>2000) return f.beds>3?440000:370000; if (f.sqft>1400) return f.baths>2?320000:280000; return 210000; } if (f.sqft>1800) return f.beds>2?260000:225000; return f.beds>2?175000:130000; },
+  (f) => { if (f.beds>3) { if (f.sqft>2200) return f.year>1990?450000:340000; return f.year>1980?295000:230000; } if (f.sqft>1600) return f.year>1990?(f.baths>2?340000:290000):225000; return f.year>1990?195000:140000; },
+  (f) => { if (f.baths>2) { if (f.sqft>1800) return f.year>1985?410000:310000; return f.beds>2?265000:200000; } if (f.sqft>1500) return f.year>1990?(f.beds>3?330000:275000):210000; return f.beds>2?170000:125000; },
+  (f) => { if (f.sqft>2000) { if (f.year>1985) return f.baths>1?400000:350000; return f.beds>3?290000:245000; } if (f.year>2000) return f.beds>2?280000:220000; if (f.beds>3) return 240000; return f.sqft>1200?180000:125000; },
+];
+function rfPredict(f) {
+  const preds = rfTrees.map(t => t(f));
+  return { avg: preds.reduce((a,b) => a+b, 0) / preds.length, individual: preds };
+}
+
+// ═══ NEURAL NETWORK (MLP) ═══
+const HW = [[0.80,-0.30,0.50,0.10],[0.15,0.70,0.60,-0.20],[-0.40,0.10,-0.10,0.85],[0.55,0.45,0.35,0.30],[-0.60,0.80,-0.25,0.05]];
+const HB = [0.20,-0.10,0.15,-0.30,0.25];
+const OW = [0.45,0.30,0.35,0.25,-0.15];
+const OB = 0.10;
+const FS = [{m:1800,s:600},{m:3.2,s:1.1},{m:2.1,s:0.8},{m:1990,s:25}];
+function nnPredict(f) {
+  const vals = [f.sqft, f.beds, f.baths, f.year];
+  const sc = vals.map((v,i) => (v - FS[i].m) / FS[i].s);
+  const hr = HW.map((ws,j) => ws.reduce((a,w,i) => a + w*sc[i], 0) + HB[j]);
+  const ha = hr.map(x => Math.max(0, x));
+  const out = OW.reduce((a,w,i) => a + w*ha[i], 0) + OB;
+  return out * 120000 + 285000;
+}
+
+// ═══ Bar Chart Component ═══
+function ComparisonChart({ models }) {
+  const canvasRef = useRef(null);
+  const W = 750, H = 260, PAD_L = 140, PAD_R = 90, PAD_T = 20, PAD_B = 40;
+
+  useEffect(() => {
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.clearRect(0, 0, W, H);
+
+    const vals = models.map(m => m.price);
+    const min = Math.min(...vals) * 0.85;
+    const max = Math.max(...vals) * 1.1;
+    const toX = (v) => PAD_L + ((v - min) / (max - min)) * (W - PAD_L - PAD_R);
+
+    const barH = 36, gap = 16;
+
+    // Grid
+    ctx.strokeStyle = "#1E293B";
+    ctx.lineWidth = 1;
+    const step = Math.round((max - min) / 5 / 10000) * 10000;
+    for (let v = Math.ceil(min / step) * step; v <= max; v += step) {
+      const x = toX(v);
+      ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, H - PAD_B); ctx.stroke();
+      ctx.fillStyle = "#475569";
+      ctx.font = "10px -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("$" + (v/1000).toFixed(0) + "K", x, H - PAD_B + 16);
+    }
+
+    // Bars
+    models.forEach((m, i) => {
+      const y = PAD_T + i * (barH + gap);
+      const barW = toX(m.price) - toX(min);
+
+      // Bar background
+      ctx.fillStyle = m.color + "30";
+      ctx.fillRect(toX(min), y, toX(max) - toX(min), barH);
+
+      // Bar
+      ctx.fillStyle = m.color;
+      ctx.fillRect(toX(min), y, barW, barH);
+
+      // Model name
+      ctx.fillStyle = m.color;
+      ctx.font = "bold 13px -apple-system, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(m.name, PAD_L - 12, y + barH / 2 + 4);
+
+      // Price label
+      ctx.fillStyle = "#F8FAFC";
+      ctx.font = "bold 13px Consolas, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("$" + Math.round(m.price).toLocaleString(), toX(m.price) + 8, y + barH / 2 + 4);
+    });
+
+  }, [models]);
+
+  return <canvas ref={canvasRef} width={W} height={H} style={{ background: "#0F172A", display: "block", margin: "0 auto" }} />;
+}
+
+
+function App() {
+  const [sqft, setSqft] = useState(1800);
+  const [beds, setBeds] = useState(3);
+  const [baths, setBaths] = useState(2);
+  const [year, setYear] = useState(2005);
+
+  const f = { sqft, beds, baths, year };
+
+  const models = useMemo(() => {
+    const rf = rfPredict(f);
+    return [
+      { name: "Linear Regression", price: lrPredict(f), color: "#3B82F6",
+        desc: "Multiplied each feature by a coefficient and added them up. One straight-line equation." },
+      { name: "Decision Tree", price: dtPredict(f), color: "#10B981",
+        desc: "Followed a path of yes/no questions. Prediction = average of training houses in the leaf." },
+      { name: "Random Forest", price: rf.avg, color: "#8B5CF6",
+        desc: `Averaged 5 trees: $${rf.individual.map(v => (v/1000).toFixed(0) + "K").join(", $")}. Spread: $${(Math.max(...rf.individual) - Math.min(...rf.individual)).toLocaleString()}.` },
+      { name: "Neural Network", price: nnPredict(f), color: "#14B8A6",
+        desc: "Forward pass through input → hidden (5 nodes + ReLU) → output. Captures non-linear patterns." },
+    ];
+  }, [sqft, beds, baths, year]);
+
+  const sliderDefs = [
+    { label: "Square Footage", value: sqft, set: setSqft, min: 600, max: 5000, step: 50, fmt: v => v.toLocaleString() + " sqft" },
+    { label: "Bedrooms", value: beds, set: setBeds, min: 1, max: 6, step: 1, fmt: v => v },
+    { label: "Bathrooms", value: baths, set: setBaths, min: 1, max: 5, step: 1, fmt: v => v },
+    { label: "Year Built", value: year, set: setYear, min: 1920, max: 2025, step: 1, fmt: v => v },
+  ];
+
+  const prices = models.map(m => m.price);
+  const spread = Math.max(...prices) - Math.min(...prices);
+  const avg = prices.reduce((a,b) => a+b, 0) / prices.length;
+
+  return (
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: 16 }}>
+      <div style={{ textAlign: "center", marginBottom: 16 }}>
+        <h1 style={{ fontSize: 32, fontWeight: "bold", marginBottom: 4 }}>Model Comparison</h1>
+        <p style={{ fontSize: 14, color: "#F97316" }}>Same house, 4 different algorithms — how do their predictions compare?</p>
+      </div>
+
+      <div style={{ background: "linear-gradient(135deg, #1A2744, #2D1B10)", border: "1px solid #F97316", borderRadius: 12, padding: 20, marginBottom: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 20, marginBottom: 6 }}><strong>One House, Four Perspectives</strong></div>
+        <p style={{ fontSize: 13, color: "#94A3B8", maxWidth: 720, margin: "0 auto", lineHeight: 1.6 }}>
+          Each algorithm approaches the same data differently. <strong style={{ color: "#3B82F6" }}>Linear Regression</strong> draws a straight line. <strong style={{ color: "#10B981" }}>Decision Tree</strong> asks yes/no questions. <strong style={{ color: "#8B5CF6" }}>Random Forest</strong> averages many trees. <strong style={{ color: "#14B8A6" }}>Neural Network</strong> transforms data through layers of weighted connections. Drag the sliders and watch how they agree or disagree — and think about <em>why</em> their answers differ.
+        </p>
+      </div>
+
+      {/* Sliders */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span style={{ fontSize: 16 }}>&#127968;</span>
+          <span style={{ fontSize: 11, fontWeight: "bold", letterSpacing: 2, color: "#F97316", textTransform: "uppercase" }}>Configure Your House</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px" }}>
+          {sliderDefs.map((s, i) => (
+            <div key={i}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 4 }}>
+                <span style={{ color: "#CBD5E1" }}>{s.label}</span>
+                <span className="mono" style={{ fontWeight: "bold", color: "#FB923C" }}>{s.fmt(s.value)}</span>
+              </div>
+              <input
+                type="range" min={s.min} max={s.max} step={s.step} value={s.value}
+                onChange={e => s.set(Number(e.target.value))}
+                style={{ width: "100%", background: `linear-gradient(to right, #F97316 ${((s.value - s.min) / (s.max - s.min)) * 100}%, #334155 ${((s.value - s.min) / (s.max - s.min)) * 100}%)` }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div style={{ background: "#111B2E", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#F97316", color: "#0B1120", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 14 }}>&#9670;</div>
+          <span style={{ color: "#F8FAFC", fontWeight: "bold", fontSize: 18 }}>Prediction Comparison</span>
+        </div>
+        <ComparisonChart models={models} />
+        <div style={{ textAlign: "center", marginTop: 12 }}>
+          <span style={{ fontSize: 12, color: "#64748B" }}>
+            Model spread: <span className="mono" style={{ color: spread < 40000 ? "#22C55E" : spread < 100000 ? "#FBBF24" : "#EF4444", fontWeight: "bold" }}>
+              ${Math.round(spread).toLocaleString()}
+            </span>
+            {" — "}
+            {spread < 40000 ? "Models mostly agree" : spread < 100000 ? "Moderate disagreement" : "Significant disagreement — models see this house very differently"}
+          </span>
+        </div>
+      </div>
+
+      {/* Model cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+        {models.map((m, i) => (
+          <div key={i} className="card" style={{ borderLeft: `3px solid ${m.color}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ color: m.color, fontWeight: "bold", fontSize: 14 }}>{m.name}</span>
+              <span className="mono" style={{ color: "#F97316", fontWeight: "bold", fontSize: 18 }}>
+                ${Math.round(m.price).toLocaleString()}
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: "#94A3B8", lineHeight: 1.5 }}>
+              {m.desc}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Discussion prompts */}
+      <div style={{ background: "#111B2E", borderRadius: 12, padding: 20 }}>
+        <div style={{ fontSize: 16, fontWeight: "bold", color: "#F8FAFC", marginBottom: 12 }}>Discussion Questions</div>
+        <div className="explain">
+          <strong>1.</strong> When do all four models agree? Try to find slider positions where they're all within $20K of each other. What kind of house is "easy" for all models to price?
+        </div>
+        <div className="explain">
+          <strong>2.</strong> When do they disagree most? Try extreme values — a tiny old house, a massive new one. Which model reacts most dramatically to changes? Why?
+        </div>
+        <div className="explain">
+          <strong>3.</strong> Notice that Linear Regression changes smoothly as you drag sliders, while Decision Tree jumps in big steps. Why? What does that tell you about how each model works?
+        </div>
+        <div className="explain">
+          <strong>4.</strong> The Random Forest prediction is always between the lowest and highest individual tree. Is it always close to the Decision Tree's prediction? Why or why not?
+        </div>
+        <div className="callout" style={{ marginBottom: 0 }}>
+          <strong>The big takeaway:</strong> There's no single "best" algorithm. Linear Regression is simple and interpretable. Decision Trees are intuitive. Random Forests are reliable. Neural Networks are flexible. Real data scientists choose based on the problem, the data, and what matters most — accuracy, interpretability, or speed.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

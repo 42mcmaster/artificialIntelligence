@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decision Tree Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0B1120; color: #F8FAFC; }
+  input[type="range"] { -webkit-appearance: none; appearance: none; height: 8px; border-radius: 4px; outline: none; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #10B981; border: 2px solid #0B1120; cursor: pointer; }
+  .card { background: #1A2744; border-radius: 12px; padding: 16px; }
+  .section { background: #111B2E; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .mono { font-family: 'Consolas', 'Monaco', monospace; }
+  .step-badge { width: 28px; height: 28px; border-radius: 50%; background: #10B981; color: #0B1120; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0; }
+  .explain { font-size: 13px; color: #CBD5E1; line-height: 1.6; margin-bottom: 14px; }
+  .explain strong { color: #F8FAFC; }
+  .explain .hl { color: #10B981; font-weight: 600; }
+  .callout { background: #1A2744; border-left: 3px solid #10B981; border-radius: 0 8px 8px 0; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: #CBD5E1; line-height: 1.5; }
+  .callout.warn-callout { border-left-color: #FBBF24; }
+  .callout strong { color: #F8FAFC; }
+  .tree-node { border-radius: 10px; padding: 10px 14px; text-align: center; transition: all 0.3s; min-width: 120px; }
+  .tree-node.active { box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }
+  .tree-node.inactive { opacity: 0.25; }
+  .tree-node.leaf { border: 2px solid #F97316; }
+  .tree-node.leaf.active { box-shadow: 0 0 20px rgba(249, 115, 22, 0.5); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+/*
+  Simulated decision tree structure:
+  Each node: { feature, threshold, question, yes, no } or { prediction, count, label }
+*/
+const TREE = {
+  id: 0, feature: "sqft", threshold: 1600, question: "Is Sq Ft > 1,600?",
+  yes: {
+    id: 1, feature: "year", threshold: 1985, question: "Is Year Built > 1985?",
+    yes: {
+      id: 3, feature: "baths", threshold: 2, question: "Is Bathrooms > 2?",
+      yes: { id: 7, prediction: 420000, count: 8200, label: "Large, Modern, 3+ Bath" },
+      no: {
+        id: 8, feature: "beds", threshold: 3, question: "Is Bedrooms > 3?",
+        yes: { id: 15, prediction: 365000, count: 12100, label: "Large, Modern, 4+ Bed" },
+        no: { id: 16, prediction: 310000, count: 18500, label: "Large, Modern, Standard" },
+      }
+    },
+    no: {
+      id: 4, feature: "beds", threshold: 3, question: "Is Bedrooms > 3?",
+      yes: { id: 9, prediction: 275000, count: 6800, label: "Large, Older, 4+ Bed" },
+      no: { id: 10, prediction: 220000, count: 14200, label: "Large, Older, Standard" },
+    }
+  },
+  no: {
+    id: 2, feature: "beds", threshold: 2, question: "Is Bedrooms > 2?",
+    yes: {
+      id: 5, feature: "year", threshold: 1990, question: "Is Year Built > 1990?",
+      yes: { id: 11, prediction: 245000, count: 11300, label: "Small, Newer, 3+ Bed" },
+      no: { id: 12, prediction: 185000, count: 9800, label: "Small, Older, 3+ Bed" },
+    },
+    no: {
+      id: 6, feature: "baths", threshold: 1, question: "Is Bathrooms > 1?",
+      yes: { id: 13, prediction: 165000, count: 7900, label: "Small, 1-2 Bed, 2+ Bath" },
+      no: { id: 14, prediction: 120000, count: 5200, label: "Small, 1-2 Bed, 1 Bath" },
+    }
+  }
+};
+
+function traverseTree(node, features) {
+  const path = [node.id];
+  const decisions = [];
+
+  let current = node;
+  while (current.prediction === undefined) {
+    const val = features[current.feature];
+    const goYes = val > current.threshold;
+    decisions.push({
+      nodeId: current.id,
+      feature: current.feature,
+      threshold: current.threshold,
+      value: val,
+      question: current.question,
+      answer: goYes,
+    });
+    current = goYes ? current.yes : current.no;
+    path.push(current.id);
+  }
+
+  return { path, decisions, prediction: current.prediction, label: current.label, count: current.count, leafId: current.id };
+}
+
+function StepBadge({ num, title }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div className="step-badge">{num}</div>
+      <span style={{ color: "#F8FAFC", fontWeight: "bold", fontSize: 18 }}>{title}</span>
+    </div>
+  );
+}
+
+// ── SVG Tree Visualization ──
+function TreeDiagram({ tree, activePath }) {
+  const W = 900, H = 400;
+  const activeSet = new Set(activePath);
+
+  // Layout positions (hand-positioned for clarity)
+  const positions = {
+    0:  { x: 450, y: 30 },
+    1:  { x: 250, y: 105 },
+    2:  { x: 650, y: 105 },
+    3:  { x: 140, y: 185 },
+    4:  { x: 360, y: 185 },
+    5:  { x: 540, y: 185 },
+    6:  { x: 760, y: 185 },
+    7:  { x: 75,  y: 280 },
+    8:  { x: 200, y: 280 },
+    9:  { x: 310, y: 280 },
+    10: { x: 420, y: 280 },
+    11: { x: 490, y: 280 },
+    12: { x: 590, y: 280 },
+    13: { x: 700, y: 280 },
+    14: { x: 810, y: 280 },
+    15: { x: 155, y: 355 },
+    16: { x: 255, y: 355 },
+  };
+
+  // Edges
+  const edges = [
+    [0,1,"Yes"],[0,2,"No"],
+    [1,3,"Yes"],[1,4,"No"],
+    [2,5,"Yes"],[2,6,"No"],
+    [3,7,"Yes"],[3,8,"No"],
+    [4,9,"Yes"],[4,10,"No"],
+    [5,11,"Yes"],[5,12,"No"],
+    [6,13,"Yes"],[6,14,"No"],
+    [8,15,"Yes"],[8,16,"No"],
+  ];
+
+  // Flatten nodes
+  function flattenNodes(node, arr = []) {
+    arr.push(node);
+    if (node.yes) flattenNodes(node.yes, arr);
+    if (node.no) flattenNodes(node.no, arr);
+    return arr;
+  }
+  const allNodes = flattenNodes(tree);
+
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", margin: "0 auto" }}>
+      {/* Edges */}
+      {edges.map(([from, to, label], i) => {
+        const p1 = positions[from], p2 = positions[to];
+        const bothActive = activeSet.has(from) && activeSet.has(to);
+        return (
+          <g key={i}>
+            <line
+              x1={p1.x} y1={p1.y + 18} x2={p2.x} y2={p2.y - 14}
+              stroke={bothActive ? "#10B981" : "#1E293B"}
+              strokeWidth={bothActive ? 2.5 : 1}
+              opacity={bothActive ? 1 : 0.4}
+            />
+            <text
+              x={(p1.x + p2.x) / 2 + (label === "Yes" ? -14 : 14)}
+              y={(p1.y + p2.y) / 2 + 6}
+              fill={bothActive ? (label === "Yes" ? "#22C55E" : "#EF4444") : "#334155"}
+              fontSize={10} fontWeight="bold" textAnchor="middle"
+            >
+              {label}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Nodes */}
+      {allNodes.map(node => {
+        const pos = positions[node.id];
+        if (!pos) return null;
+        const isLeaf = node.prediction !== undefined;
+        const isActive = activeSet.has(node.id);
+        const isLeafTarget = isLeaf && isActive;
+
+        return (
+          <g key={node.id}>
+            <rect
+              x={pos.x - (isLeaf ? 48 : 55)} y={pos.y - 14}
+              width={isLeaf ? 96 : 110} height={isLeaf ? 44 : 28}
+              rx={6}
+              fill={isLeafTarget ? "#F97316" : isActive ? "#10B981" : "#1A2744"}
+              opacity={isActive ? 1 : 0.3}
+              stroke={isLeafTarget ? "#F97316" : isActive ? "#10B981" : "#334155"}
+              strokeWidth={isActive ? 2 : 1}
+            />
+            {isLeaf ? (
+              <>
+                <text x={pos.x} y={pos.y + 2} fill={isActive ? "#0B1120" : "#64748B"} fontSize={11} fontWeight="bold" textAnchor="middle" fontFamily="Consolas, monospace">
+                  ${(node.prediction / 1000).toFixed(0)}K
+                </text>
+                <text x={pos.x} y={pos.y + 18} fill={isActive ? "#0B1120" : "#475569"} fontSize={8} textAnchor="middle" opacity={0.8}>
+                  {node.count.toLocaleString()} houses
+                </text>
+              </>
+            ) : (
+              <text x={pos.x} y={pos.y + 3} fill={isActive ? "#0B1120" : "#94A3B8"} fontSize={10} fontWeight="bold" textAnchor="middle">
+                {node.question}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+
+function App() {
+  const [sqft, setSqft] = useState(1800);
+  const [beds, setBeds] = useState(3);
+  const [baths, setBaths] = useState(2);
+  const [year, setYear] = useState(2005);
+
+  const features = { sqft, beds, baths, year };
+  const result = useMemo(() => traverseTree(TREE, features), [sqft, beds, baths, year]);
+
+  const sliderDefs = [
+    { label: "Square Footage", value: sqft, set: setSqft, min: 600, max: 5000, step: 50, fmt: v => v.toLocaleString() + " sqft" },
+    { label: "Bedrooms", value: beds, set: setBeds, min: 1, max: 6, step: 1, fmt: v => v },
+    { label: "Bathrooms", value: baths, set: setBaths, min: 1, max: 5, step: 1, fmt: v => v },
+    { label: "Year Built", value: year, set: setYear, min: 1920, max: 2025, step: 1, fmt: v => v },
+  ];
+
+  const featureLabels = { sqft: "Square Footage", beds: "Bedrooms", baths: "Bathrooms", year: "Year Built" };
+
+  return (
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: 16 }}>
+      {/* Header */}
+      <div style={{ textAlign: "center", marginBottom: 16 }}>
+        <h1 style={{ fontSize: 32, fontWeight: "bold", marginBottom: 4 }}>Decision Tree Explorer</h1>
+        <p style={{ fontSize: 14, color: "#10B981" }}>A series of yes/no questions leading to a prediction</p>
+      </div>
+
+      {/* Context */}
+      <div style={{ background: "linear-gradient(135deg, #1A2744, #0D3330)", border: "1px solid #10B981", borderRadius: 12, padding: 20, marginBottom: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 20, marginBottom: 6 }}><strong>How a Decision Tree Works</strong></div>
+        <p style={{ fontSize: 13, color: "#94A3B8", maxWidth: 720, margin: "0 auto", lineHeight: 1.6 }}>
+          A decision tree makes predictions by asking a <strong style={{ color: "#F8FAFC" }}>series of yes/no questions</strong> about the data. At each step, it picks the question that best splits the training data into groups with similar prices. Your house follows a path through these questions until it lands in a <strong style={{ color: "#F97316" }}>leaf node</strong> — a group of training houses that were similar. The prediction is the <strong style={{ color: "#10B981" }}>average price</strong> of the houses in that leaf.
+        </p>
+      </div>
+
+      {/* Sliders */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span style={{ fontSize: 16 }}>&#127968;</span>
+          <span style={{ fontSize: 11, fontWeight: "bold", letterSpacing: 2, color: "#10B981", textTransform: "uppercase" }}>New House to Predict</span>
+        </div>
+        <p style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>Adjust the features and watch your house follow a different path through the tree.</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px" }}>
+          {sliderDefs.map((s, i) => (
+            <div key={i}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 4 }}>
+                <span style={{ color: "#CBD5E1" }}>{s.label}</span>
+                <span className="mono" style={{ fontWeight: "bold", color: "#34D399" }}>{s.fmt(s.value)}</span>
+              </div>
+              <input
+                type="range" min={s.min} max={s.max} step={s.step} value={s.value}
+                onChange={e => s.set(Number(e.target.value))}
+                style={{ width: "100%", background: `linear-gradient(to right, #10B981 ${((s.value - s.min) / (s.max - s.min)) * 100}%, #334155 ${((s.value - s.min) / (s.max - s.min)) * 100}%)` }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── TREE VISUALIZATION ── */}
+      <div className="section">
+        <StepBadge num={1} title="The Tree — Follow the Green Path" />
+        <div className="explain">
+          The tree below was built during training by examining 100,000 houses and finding the <strong>best yes/no split at each level</strong>. The algorithm tried every possible question ("Is sqft > 1,200?", "Is sqft > 1,400?", etc.) and picked the one that separated high-priced and low-priced houses most cleanly. This process repeated at each branch until the groups were small and similar enough.
+        </div>
+        <div className="explain">
+          The <span className="hl">green highlighted path</span> shows the route your house takes through the tree. Each green node is a question being asked about your house. The <strong style={{ color: "#F97316" }}>orange node</strong> at the end is the leaf — the group your house falls into.
+        </div>
+        <div style={{ overflowX: "auto", marginBottom: 12 }}>
+          <TreeDiagram tree={TREE} activePath={result.path} />
+        </div>
+        <div className="callout warn-callout">
+          <strong>Try it:</strong> Drag Square Footage from 1,500 to 1,700. Watch the first question ("Is Sq Ft &gt; 1,600?") flip from No to Yes, sending your house down a completely different branch. One small change in a feature can lead to a very different prediction.
+        </div>
+      </div>
+
+      {/* ── DECISION PATH ── */}
+      <div className="section">
+        <StepBadge num={2} title="The Decision Path — Step by Step" />
+        <div className="explain">
+          Here's every question the tree asked about your house, in order. At each step, the tree looks at <strong>one feature</strong> and compares it to a <strong>threshold</strong> (a number it learned during training). Based on the answer, it goes left or right.
+        </div>
+        <div className="explain">
+          Notice that unlike the neural network (which looks at all features simultaneously in every node), the decision tree looks at <strong>one feature at a time</strong>. It builds up its understanding through a sequence of simple questions rather than one complex calculation.
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+          {result.decisions.map((d, i) => (
+            <div key={i} className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: 12 }}>
+              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#10B981", color: "#0B1120", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 13, flexShrink: 0 }}>
+                {i + 1}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: "bold", color: "#F8FAFC", marginBottom: 2 }}>
+                  {d.question}
+                </div>
+                <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                  Your house: <span className="mono" style={{ color: "#34D399" }}>{featureLabels[d.feature]} = {d.value.toLocaleString()}</span>
+                  {" → "}
+                  <span style={{ fontWeight: "bold", color: d.answer ? "#22C55E" : "#EF4444" }}>
+                    {d.answer ? "YES" : "NO"}
+                  </span>
+                  <span style={{ color: "#64748B" }}> → go {d.answer ? "left" : "right"}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Leaf */}
+          <div className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, border: "2px solid #F97316" }}>
+            <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#F97316", color: "#0B1120", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 13, flexShrink: 0 }}>
+              &#9679;
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: "bold", color: "#F97316", marginBottom: 2 }}>
+                Leaf: "{result.label}"
+              </div>
+              <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                This group contains <span className="mono" style={{ color: "#F8FAFC" }}>{result.count.toLocaleString()}</span> training houses with an average price of <span className="mono" style={{ fontWeight: "bold", color: "#F97316" }}>${result.prediction.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="callout">
+          <strong>The prediction is just an average.</strong> The tree sorted your house into a group of similar houses from the training data, and the predicted price is simply the average selling price of that group. More houses in the leaf = more data backing the prediction.
+        </div>
+      </div>
+
+      {/* ── STRENGTHS & WEAKNESSES ── */}
+      <div className="section">
+        <StepBadge num={3} title="Strengths and Limitations" />
+        <div className="explain">
+          Decision trees are <strong>incredibly interpretable</strong> — you can explain exactly why the model made its prediction by tracing the path. They also handle <strong>non-linear relationships</strong> naturally: the tree can learn that year matters differently for big vs. small houses by splitting on different features at different levels.
+        </div>
+        <div className="explain">
+          But single trees have a big weakness: they tend to <strong>overfit</strong>. Given enough depth, a tree will memorize the training data, creating tiny leaves with just a few houses each. Those predictions are precise for the training data but terrible for new houses. The tree also makes <strong>rigid, blocky predictions</strong> — every house in a leaf gets the same price, creating sharp jumps at boundaries.
+        </div>
+        <div className="callout warn-callout">
+          <strong>This is exactly why Random Forests exist.</strong> Instead of trusting one tree, you build hundreds of slightly different trees and average their predictions. The individual trees might overfit in different directions, but the average smooths everything out. That's the next explorer to try.
+        </div>
+      </div>
+
+      {/* Prediction */}
+      <div className="section" style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 2, color: "#94A3B8", marginBottom: 4 }}>Predicted Selling Price</div>
+        <div className="mono" style={{ fontSize: 52, fontWeight: "bold", color: "#F97316" }}>
+          ${result.prediction.toLocaleString()}
+        </div>
+        <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>
+          Based on the average of {result.count.toLocaleString()} similar training houses in the "{result.label}" leaf.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

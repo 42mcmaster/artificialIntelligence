@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Random Forest Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0B1120; color: #F8FAFC; }
+  input[type="range"] { -webkit-appearance: none; appearance: none; height: 8px; border-radius: 4px; outline: none; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #8B5CF6; border: 2px solid #0B1120; cursor: pointer; }
+  .card { background: #1A2744; border-radius: 12px; padding: 16px; }
+  .section { background: #111B2E; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .mono { font-family: 'Consolas', 'Monaco', monospace; }
+  .step-badge { width: 28px; height: 28px; border-radius: 50%; background: #8B5CF6; color: #F8FAFC; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0; }
+  .explain { font-size: 13px; color: #CBD5E1; line-height: 1.6; margin-bottom: 14px; }
+  .explain strong { color: #F8FAFC; }
+  .explain .hl { color: #8B5CF6; font-weight: 600; }
+  .callout { background: #1A2744; border-left: 3px solid #8B5CF6; border-radius: 0 8px 8px 0; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: #CBD5E1; line-height: 1.5; }
+  .callout.warn-callout { border-left-color: #FBBF24; }
+  .callout strong { color: #F8FAFC; }
+  canvas { border-radius: 8px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useRef, useEffect } = React;
+
+// ── 5 Simulated Trees (each slightly different) ──
+function makeTree(seed) {
+  // Each tree has different thresholds/structure to simulate bootstrap variation
+  const trees = [
+    // Tree 1: sqft-first, standard
+    { name: "Tree 1", color: "#3B82F6",
+      predict: (f) => {
+        if (f.sqft > 1700) {
+          if (f.year > 1990) return f.baths > 2 ? 415000 : (f.beds > 3 ? 355000 : 305000);
+          return f.beds > 3 ? 268000 : 215000;
+        }
+        if (f.beds > 2) return f.year > 1985 ? 240000 : 178000;
+        return f.baths > 1 ? 158000 : 115000;
+      },
+      getPath: (f) => {
+        const p = [f.sqft > 1700 ? "Sqft > 1700? YES" : "Sqft > 1700? NO"];
+        if (f.sqft > 1700) {
+          p.push(f.year > 1990 ? "Year > 1990? YES" : "Year > 1990? NO");
+          if (f.year > 1990) p.push(f.baths > 2 ? "Baths > 2? YES" : (f.beds > 3 ? "Beds > 3? YES" : "Beds > 3? NO"));
+          else p.push(f.beds > 3 ? "Beds > 3? YES" : "Beds > 3? NO");
+        } else {
+          p.push(f.beds > 2 ? "Beds > 2? YES" : "Beds > 2? NO");
+          if (f.beds > 2) p.push(f.year > 1985 ? "Year > 1985? YES" : "Year > 1985? NO");
+          else p.push(f.baths > 1 ? "Baths > 1? YES" : "Baths > 1? NO");
+        }
+        return p;
+      }
+    },
+    // Tree 2: year-first
+    { name: "Tree 2", color: "#10B981",
+      predict: (f) => {
+        if (f.year > 1995) {
+          if (f.sqft > 2000) return f.beds > 3 ? 440000 : 370000;
+          if (f.sqft > 1400) return f.baths > 2 ? 320000 : 280000;
+          return 210000;
+        }
+        if (f.sqft > 1800) return f.beds > 2 ? 260000 : 225000;
+        return f.beds > 2 ? 175000 : 130000;
+      },
+      getPath: (f) => {
+        const p = [f.year > 1995 ? "Year > 1995? YES" : "Year > 1995? NO"];
+        if (f.year > 1995) {
+          if (f.sqft > 2000) { p.push("Sqft > 2000? YES"); p.push(f.beds > 3 ? "Beds > 3? YES" : "Beds > 3? NO"); }
+          else if (f.sqft > 1400) { p.push("Sqft > 1400? YES"); p.push(f.baths > 2 ? "Baths > 2? YES" : "Baths > 2? NO"); }
+          else { p.push("Sqft > 1400? NO"); p.push("→ Leaf"); }
+        } else {
+          p.push(f.sqft > 1800 ? "Sqft > 1800? YES" : "Sqft > 1800? NO");
+          if (f.sqft > 1800) p.push(f.beds > 2 ? "Beds > 2? YES" : "Beds > 2? NO");
+          else p.push(f.beds > 2 ? "Beds > 2? YES" : "Beds > 2? NO");
+        }
+        return p;
+      }
+    },
+    // Tree 3: beds-first
+    { name: "Tree 3", color: "#F59E0B",
+      predict: (f) => {
+        if (f.beds > 3) {
+          if (f.sqft > 2200) return f.year > 1990 ? 450000 : 340000;
+          return f.year > 1980 ? 295000 : 230000;
+        }
+        if (f.sqft > 1600) {
+          return f.year > 1990 ? (f.baths > 2 ? 340000 : 290000) : 225000;
+        }
+        return f.year > 1990 ? 195000 : 140000;
+      },
+      getPath: (f) => {
+        const p = [f.beds > 3 ? "Beds > 3? YES" : "Beds > 3? NO"];
+        if (f.beds > 3) {
+          p.push(f.sqft > 2200 ? "Sqft > 2200? YES" : "Sqft > 2200? NO");
+          if (f.sqft > 2200) p.push(f.year > 1990 ? "Year > 1990? YES" : "Year > 1990? NO");
+          else p.push(f.year > 1980 ? "Year > 1980? YES" : "Year > 1980? NO");
+        } else {
+          p.push(f.sqft > 1600 ? "Sqft > 1600? YES" : "Sqft > 1600? NO");
+          p.push(f.year > 1990 ? "Year > 1990? YES" : "Year > 1990? NO");
+        }
+        return p;
+      }
+    },
+    // Tree 4: baths-first
+    { name: "Tree 4", color: "#EC4899",
+      predict: (f) => {
+        if (f.baths > 2) {
+          if (f.sqft > 1800) return f.year > 1985 ? 410000 : 310000;
+          return f.beds > 2 ? 265000 : 200000;
+        }
+        if (f.sqft > 1500) {
+          return f.year > 1990 ? (f.beds > 3 ? 330000 : 275000) : 210000;
+        }
+        return f.beds > 2 ? 170000 : 125000;
+      },
+      getPath: (f) => {
+        const p = [f.baths > 2 ? "Baths > 2? YES" : "Baths > 2? NO"];
+        if (f.baths > 2) {
+          p.push(f.sqft > 1800 ? "Sqft > 1800? YES" : "Sqft > 1800? NO");
+          if (f.sqft > 1800) p.push(f.year > 1985 ? "Year > 1985? YES" : "Year > 1985? NO");
+          else p.push(f.beds > 2 ? "Beds > 2? YES" : "Beds > 2? NO");
+        } else {
+          p.push(f.sqft > 1500 ? "Sqft > 1500? YES" : "Sqft > 1500? NO");
+          if (f.sqft > 1500) p.push(f.year > 1990 ? "Year > 1990? YES" : "Year > 1990? NO");
+          else p.push(f.beds > 2 ? "Beds > 2? YES" : "Beds > 2? NO");
+        }
+        return p;
+      }
+    },
+    // Tree 5: sqft-first but different thresholds
+    { name: "Tree 5", color: "#14B8A6",
+      predict: (f) => {
+        if (f.sqft > 2000) {
+          if (f.year > 1985) return f.baths > 1 ? 400000 : 350000;
+          return f.beds > 3 ? 290000 : 245000;
+        }
+        if (f.year > 2000) return f.beds > 2 ? 280000 : 220000;
+        if (f.beds > 3) return 240000;
+        return f.sqft > 1200 ? 180000 : 125000;
+      },
+      getPath: (f) => {
+        const p = [f.sqft > 2000 ? "Sqft > 2000? YES" : "Sqft > 2000? NO"];
+        if (f.sqft > 2000) {
+          p.push(f.year > 1985 ? "Year > 1985? YES" : "Year > 1985? NO");
+          if (f.year > 1985) p.push(f.baths > 1 ? "Baths > 1? YES" : "Baths > 1? NO");
+          else p.push(f.beds > 3 ? "Beds > 3? YES" : "Beds > 3? NO");
+        } else {
+          if (f.year > 2000) { p.push("Year > 2000? YES"); p.push(f.beds > 2 ? "Beds > 2? YES" : "Beds > 2? NO"); }
+          else if (f.beds > 3) { p.push("Beds > 3? YES"); p.push("→ Leaf"); }
+          else { p.push("Beds > 3? NO"); p.push(f.sqft > 1200 ? "Sqft > 1200? YES" : "Sqft > 1200? NO"); }
+        }
+        return p;
+      }
+    },
+  ];
+  return trees;
+}
+
+const TREES = makeTree();
+
+function StepBadge({ num, title }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div className="step-badge">{num}</div>
+      <span style={{ color: "#F8FAFC", fontWeight: "bold", fontSize: 18 }}>{title}</span>
+    </div>
+  );
+}
+
+// ── Dot Plot for comparing predictions ──
+function DotPlot({ predictions, average, treeColors }) {
+  const canvasRef = useRef(null);
+  const W = 700, H = 120, PAD = 60;
+
+  useEffect(() => {
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.clearRect(0, 0, W, H);
+
+    const allVals = [...predictions, average];
+    const min = Math.min(...allVals) - 30000;
+    const max = Math.max(...allVals) + 30000;
+    const toX = (v) => PAD + ((v - min) / (max - min)) * (W - PAD * 2);
+
+    // Axis line
+    ctx.strokeStyle = "#334155";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(PAD, H - 40);
+    ctx.lineTo(W - PAD, H - 40);
+    ctx.stroke();
+
+    // Tick marks
+    ctx.fillStyle = "#64748B";
+    ctx.font = "10px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    const step = Math.round((max - min) / 5 / 10000) * 10000;
+    for (let v = Math.ceil(min / step) * step; v <= max; v += step) {
+      const x = toX(v);
+      ctx.beginPath(); ctx.moveTo(x, H - 40); ctx.lineTo(x, H - 35); ctx.stroke();
+      ctx.fillText("$" + (v / 1000).toFixed(0) + "K", x, H - 22);
+    }
+
+    // Average line (dashed)
+    const avgX = toX(average);
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = "#F97316";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(avgX, 10);
+    ctx.lineTo(avgX, H - 40);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Average label
+    ctx.fillStyle = "#F97316";
+    ctx.font = "bold 12px Consolas, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("AVG: $" + Math.round(average).toLocaleString(), avgX, H - 6);
+
+    // Tree dots
+    predictions.forEach((p, i) => {
+      const x = toX(p);
+      const y = 35;
+
+      // Connecting line to axis
+      ctx.strokeStyle = treeColors[i];
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(x, y + 14);
+      ctx.lineTo(x, H - 40);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Dot
+      ctx.fillStyle = treeColors[i];
+      ctx.beginPath();
+      ctx.arc(x, y, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label
+      ctx.fillStyle = "#0B1120";
+      ctx.font = "bold 9px -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("T" + (i + 1), x, y + 3);
+    });
+
+  }, [predictions, average]);
+
+  return <canvas ref={canvasRef} width={W} height={H} style={{ background: "#0F172A", display: "block", margin: "0 auto" }} />;
+}
+
+
+function App() {
+  const [sqft, setSqft] = useState(1800);
+  const [beds, setBeds] = useState(3);
+  const [baths, setBaths] = useState(2);
+  const [year, setYear] = useState(2005);
+
+  const features = { sqft, beds, baths, year };
+
+  const treeResults = useMemo(() =>
+    TREES.map(t => ({
+      name: t.name,
+      color: t.color,
+      prediction: t.predict(features),
+      path: t.getPath(features),
+    })),
+    [sqft, beds, baths, year]
+  );
+
+  const predictions = treeResults.map(r => r.prediction);
+  const average = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+  const spread = Math.max(...predictions) - Math.min(...predictions);
+
+  const sliderDefs = [
+    { label: "Square Footage", value: sqft, set: setSqft, min: 600, max: 5000, step: 50, fmt: v => v.toLocaleString() + " sqft" },
+    { label: "Bedrooms", value: beds, set: setBeds, min: 1, max: 6, step: 1, fmt: v => v },
+    { label: "Bathrooms", value: baths, set: setBaths, min: 1, max: 5, step: 1, fmt: v => v },
+    { label: "Year Built", value: year, set: setYear, min: 1920, max: 2025, step: 1, fmt: v => v },
+  ];
+
+  return (
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: 16 }}>
+      {/* Header */}
+      <div style={{ textAlign: "center", marginBottom: 16 }}>
+        <h1 style={{ fontSize: 32, fontWeight: "bold", marginBottom: 4 }}>Random Forest Explorer</h1>
+        <p style={{ fontSize: 14, color: "#8B5CF6" }}>Many trees, one prediction — the wisdom of crowds</p>
+      </div>
+
+      {/* Context */}
+      <div style={{ background: "linear-gradient(135deg, #1A2744, #1E1B4B)", border: "1px solid #8B5CF6", borderRadius: 12, padding: 20, marginBottom: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 20, marginBottom: 6 }}><strong>How a Random Forest Works</strong></div>
+        <p style={{ fontSize: 13, color: "#94A3B8", maxWidth: 720, margin: "0 auto", lineHeight: 1.6 }}>
+          A single decision tree can overfit — it memorizes quirks in the training data. A Random Forest fixes this by building <strong style={{ color: "#F8FAFC" }}>many trees</strong> (often hundreds), each trained on a <strong style={{ color: "#8B5CF6" }}>random sample</strong> of the data and considering a <strong style={{ color: "#8B5CF6" }}>random subset of features</strong> at each split. Each tree is slightly different — it sees a different slice of the data and asks different questions. To make a prediction, <strong style={{ color: "#F97316" }}>every tree votes</strong>, and the forest averages them. Individual trees might be wrong in different directions, but the average tends to be much more accurate. This is called <strong style={{ color: "#F8FAFC" }}>ensemble learning</strong>.
+        </p>
+      </div>
+
+      {/* Sliders */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span style={{ fontSize: 16 }}>&#127968;</span>
+          <span style={{ fontSize: 11, fontWeight: "bold", letterSpacing: 2, color: "#8B5CF6", textTransform: "uppercase" }}>New House to Predict</span>
+        </div>
+        <p style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>Same house features — watch 5 different trees give 5 different opinions, then see the average.</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px" }}>
+          {sliderDefs.map((s, i) => (
+            <div key={i}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 4 }}>
+                <span style={{ color: "#CBD5E1" }}>{s.label}</span>
+                <span className="mono" style={{ fontWeight: "bold", color: "#A78BFA" }}>{s.fmt(s.value)}</span>
+              </div>
+              <input
+                type="range" min={s.min} max={s.max} step={s.step} value={s.value}
+                onChange={e => s.set(Number(e.target.value))}
+                style={{ width: "100%", background: `linear-gradient(to right, #8B5CF6 ${((s.value - s.min) / (s.max - s.min)) * 100}%, #334155 ${((s.value - s.min) / (s.max - s.min)) * 100}%)` }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── STEP 1: INDIVIDUAL TREES ── */}
+      <div className="section">
+        <StepBadge num={1} title="Each Tree Decides Independently" />
+        <div className="explain">
+          Below are <strong>5 trees</strong> from our forest. In a real Random Forest, there might be 100 or 500 trees — we're showing 5 so you can see how they differ. Each tree was trained on a <strong>random sample</strong> (with replacement) of the 100,000 training houses, and at each split it only considered a <strong>random subset of features</strong>.
+        </div>
+        <div className="explain">
+          This randomness is the key innovation. Notice how each tree <strong>starts with a different question</strong> — Tree 1 asks about square footage first, Tree 2 asks about year, Tree 3 asks about bedrooms. They've each learned slightly different patterns from their random slice of the data. This is intentional — diversity among the trees is what makes the forest smart.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+          {treeResults.map((t, i) => (
+            <div key={i} className="card" style={{ borderLeft: `3px solid ${t.color}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ color: t.color, fontWeight: "bold", fontSize: 14 }}>{t.name}</span>
+                <span className="mono" style={{ color: t.color, fontWeight: "bold", fontSize: 16 }}>
+                  ${t.prediction.toLocaleString()}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {t.path.map((step, j) => (
+                  <span key={j} style={{
+                    background: "#0F172A",
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                    fontSize: 11,
+                    color: step.includes("YES") ? "#22C55E" : step.includes("NO") ? "#EF4444" : "#94A3B8",
+                    fontFamily: "'Consolas', monospace",
+                  }}>
+                    {step}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="callout warn-callout" style={{ marginTop: 12 }}>
+          <strong>Try it:</strong> Drag the sliders and notice how sometimes all 5 trees agree closely, but other times they disagree wildly. When they disagree, that's the forest telling you "this is a hard case — the data is ambiguous here." The spread between predictions is a rough measure of uncertainty.
+        </div>
+      </div>
+
+      {/* ── STEP 2: DOT PLOT ── */}
+      <div className="section">
+        <StepBadge num={2} title="Comparing Predictions — The Dot Plot" />
+        <div className="explain">
+          The dot plot below shows each tree's prediction as a <strong>colored dot on a number line</strong>. The <strong style={{ color: "#F97316" }}>orange dashed line</strong> is the forest's final prediction — the average of all 5 trees.
+        </div>
+        <div className="explain">
+          When the dots are <strong>clustered tightly together</strong>, the trees agree and the forest is confident. When the dots are <strong>spread far apart</strong>, the trees disagree and the prediction is less certain. This visual spread gives you an intuitive sense of how confident the model is — something a single decision tree can't tell you.
+        </div>
+        <DotPlot predictions={predictions} average={average} treeColors={treeResults.map(t => t.color)} />
+        <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: 12 }}>
+          <div style={{ fontSize: 12, color: "#94A3B8" }}>
+            Spread: <span className="mono" style={{ color: spread < 80000 ? "#22C55E" : spread < 150000 ? "#FBBF24" : "#EF4444", fontWeight: "bold" }}>
+              ${spread.toLocaleString()}
+            </span>
+            <span style={{ marginLeft: 6, fontSize: 11 }}>
+              ({spread < 80000 ? "trees agree — high confidence" : spread < 150000 ? "moderate disagreement" : "trees disagree — low confidence"})
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── STEP 3: WHY AVERAGING WORKS ── */}
+      <div className="section">
+        <StepBadge num={3} title="Why Averaging Works" />
+        <div className="explain">
+          Imagine asking 5 people to guess the number of jelly beans in a jar. Each person's guess might be off, but some will guess too high and others too low. When you average all 5 guesses, the errors tend to <strong>cancel out</strong>, and the average is usually closer to the truth than any single guess. This is the same principle behind Random Forests.
+        </div>
+        <div className="explain">
+          Each tree overfits to its random sample in a slightly different way. Tree 1 might overvalue square footage, Tree 3 might overvalue bedrooms. But when you average them, these biases wash out and you get a <strong>smoother, more reliable prediction</strong>. The technical term is that averaging <span className="hl">reduces variance</span> without increasing bias.
+        </div>
+        <div className="callout">
+          <strong>The three key ingredients that make this work:</strong> (1) Each tree is trained on a different random sample of the data (called <strong>bagging</strong> or bootstrap aggregation). (2) At each split, each tree only considers a random subset of features. (3) The trees are never "talking" to each other — they're completely independent. This independence is what makes their errors cancel out.
+        </div>
+        <div className="explain">
+          <strong>How many trees?</strong> In practice, random forests use 100-500 trees. More trees generally means better predictions, but with diminishing returns — going from 10 to 100 trees helps a lot, but going from 100 to 1000 helps only a little. And more trees means slower predictions.
+        </div>
+      </div>
+
+      {/* ── PREDICTION ── */}
+      <div className="section" style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 2, color: "#94A3B8", marginBottom: 4 }}>Forest Prediction (Average of 5 Trees)</div>
+        <div className="mono" style={{ fontSize: 52, fontWeight: "bold", color: "#F97316" }}>
+          ${Math.round(average).toLocaleString()}
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: "#64748B" }}>
+            Low: <span className="mono" style={{ color: "#94A3B8" }}>${Math.min(...predictions).toLocaleString()}</span>
+          </div>
+          <div style={{ fontSize: 12, color: "#64748B" }}>
+            High: <span className="mono" style={{ color: "#94A3B8" }}>${Math.max(...predictions).toLocaleString()}</span>
+          </div>
+          <div style={{ fontSize: 12, color: "#64748B" }}>
+            Spread: <span className="mono" style={{ color: "#94A3B8" }}>${spread.toLocaleString()}</span>
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: "#64748B", marginTop: 8, maxWidth: 600, margin: "8px auto 0" }}>
+          More reliable than any single tree, because the individual errors cancel out.
+        </div>
+      </div>
+
+      <div style={{ textAlign: "center", marginTop: 20, fontSize: 12, color: "#475569", lineHeight: 1.6, maxWidth: 650, margin: "20px auto 0" }}>
+        <strong style={{ color: "#94A3B8" }}>Random Forest = many decision trees + randomness + averaging.</strong> It trades interpretability (you can't easily trace one path anymore) for accuracy and reliability. In practice, Random Forests are one of the most consistently effective algorithms in machine learning.
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

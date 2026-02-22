@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neural Network Training — Watch It Learn</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0B1120; color: #F8FAFC; }
+  .card { background: #1A2744; border-radius: 12px; padding: 16px; }
+  .section { background: #111B2E; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .mono { font-family: 'Consolas', 'Monaco', monospace; }
+  .step-badge { width: 28px; height: 28px; border-radius: 50%; background: #F97316; color: #0B1120; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0; }
+  .explain { font-size: 13px; color: #CBD5E1; line-height: 1.6; margin-bottom: 14px; }
+  .explain strong { color: #F8FAFC; }
+  .explain .hl { color: #F97316; font-weight: 600; }
+  .callout { background: #1A2744; border-left: 3px solid #F97316; border-radius: 0 8px 8px 0; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: #CBD5E1; line-height: 1.5; }
+  .callout.teal { border-left-color: #14B8A6; }
+  .callout.warn { border-left-color: #FBBF24; }
+  .callout.red { border-left-color: #EF4444; }
+  .callout strong { color: #F8FAFC; }
+  canvas { border-radius: 8px; }
+  button { cursor: pointer; border: none; font-family: inherit; }
+  .ctrl-btn { padding: 10px 24px; border-radius: 10px; font-size: 14px; font-weight: bold; transition: all 0.2s; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+// ══════════════════════════════════════════════════
+// SIMULATED TRAINING DATA & MINI-NETWORK
+// ══════════════════════════════════════════════════
+
+// Seeded RNG
+function makeRng(seed) {
+  let s = seed;
+  return () => { s = (s * 16807 + 13) % 2147483647; return s / 2147483647; };
+}
+
+// Generate 20 "training houses" for visualization
+function generateTrainingData() {
+  const rng = makeRng(42);
+  const houses = [];
+  for (let i = 0; i < 20; i++) {
+    const sqft = 800 + rng() * 3500;
+    const beds = 1 + Math.floor(rng() * 5);
+    const baths = 1 + Math.floor(rng() * 4);
+    const year = 1935 + Math.floor(rng() * 85);
+    // "True" price with some noise
+    const price = 50 * sqft + 12000 * beds + 18000 * baths + 900 * year - 1600000 + (rng() - 0.5) * 40000;
+    houses.push({ sqft, beds, baths, year, price: Math.max(60000, price) });
+  }
+  return houses;
+}
+
+const TRAINING_DATA = generateTrainingData();
+
+// Feature scaling stats (from training data)
+const MEANS = { sqft: 0, beds: 0, baths: 0, year: 0 };
+const STDS = { sqft: 0, beds: 0, baths: 0, year: 0 };
+const keys = ["sqft", "beds", "baths", "year"];
+keys.forEach(k => {
+  const vals = TRAINING_DATA.map(h => h[k]);
+  MEANS[k] = vals.reduce((a, b) => a + b) / vals.length;
+  STDS[k] = Math.sqrt(vals.reduce((a, v) => a + (v - MEANS[k]) ** 2, 0) / vals.length) || 1;
+});
+const priceMean = TRAINING_DATA.reduce((a, h) => a + h.price, 0) / TRAINING_DATA.length;
+const priceStd = Math.sqrt(TRAINING_DATA.reduce((a, h) => a + (h.price - priceMean) ** 2, 0) / TRAINING_DATA.length) || 1;
+
+function scaleFeatures(house) {
+  return keys.map(k => (house[k] - MEANS[k]) / STDS[k]);
+}
+
+// Mini network: 4 inputs → 3 hidden (ReLU) → 1 output
+function initWeights(rng) {
+  return {
+    hw: Array.from({ length: 3 }, () => Array.from({ length: 4 }, () => (rng() - 0.5) * 0.8)),
+    hb: Array.from({ length: 3 }, () => (rng() - 0.5) * 0.3),
+    ow: Array.from({ length: 3 }, () => (rng() - 0.5) * 0.8),
+    ob: (rng() - 0.5) * 0.3,
+  };
+}
+
+function forwardPass(x, w) {
+  const hiddenRaw = w.hw.map((ws, j) => ws.reduce((a, wv, i) => a + wv * x[i], 0) + w.hb[j]);
+  const hiddenAct = hiddenRaw.map(v => Math.max(0, v));
+  const out = w.ow.reduce((a, wv, i) => a + wv * hiddenAct[i], 0) + w.ob;
+  return { hiddenRaw, hiddenAct, out };
+}
+
+function computeLoss(w, data) {
+  let totalSE = 0;
+  data.forEach(house => {
+    const x = scaleFeatures(house);
+    const target = (house.price - priceMean) / priceStd;
+    const { out } = forwardPass(x, w);
+    totalSE += (out - target) ** 2;
+  });
+  return totalSE / data.length;
+}
+
+function trainStep(w, data, lr) {
+  // Numerical gradients (simple for visualization — real training uses calculus)
+  const eps = 0.001;
+  const baseLoss = computeLoss(w, data);
+
+  // Temp copy for perturbation — restored after each gradient calc
+  const tmp = {
+    hw: w.hw.map(row => [...row]),
+    hb: [...w.hb],
+    ow: [...w.ow],
+    ob: w.ob,
+  };
+
+  // Result weights
+  const nw = {
+    hw: w.hw.map(row => [...row]),
+    hb: [...w.hb],
+    ow: [...w.ow],
+    ob: w.ob,
+  };
+
+  // Hidden weights
+  for (let j = 0; j < 3; j++) {
+    for (let i = 0; i < 4; i++) {
+      tmp.hw[j][i] = w.hw[j][i] + eps;
+      const grad = (computeLoss(tmp, data) - baseLoss) / eps;
+      tmp.hw[j][i] = w.hw[j][i]; // restore
+      nw.hw[j][i] = w.hw[j][i] - lr * Math.max(-5, Math.min(5, grad));
+    }
+  }
+  // Hidden biases
+  for (let j = 0; j < 3; j++) {
+    tmp.hb[j] = w.hb[j] + eps;
+    const grad = (computeLoss(tmp, data) - baseLoss) / eps;
+    tmp.hb[j] = w.hb[j]; // restore
+    nw.hb[j] = w.hb[j] - lr * Math.max(-5, Math.min(5, grad));
+  }
+  // Output weights
+  for (let i = 0; i < 3; i++) {
+    tmp.ow[i] = w.ow[i] + eps;
+    const grad = (computeLoss(tmp, data) - baseLoss) / eps;
+    tmp.ow[i] = w.ow[i]; // restore
+    nw.ow[i] = w.ow[i] - lr * Math.max(-5, Math.min(5, grad));
+  }
+  // Output bias
+  tmp.ob = w.ob + eps;
+  const gradOb = (computeLoss(tmp, data) - baseLoss) / eps;
+  tmp.ob = w.ob; // restore
+  nw.ob = w.ob - lr * Math.max(-5, Math.min(5, gradOb));
+
+  return nw;
+}
+
+// ══════════════════════════════════════════════════
+// COMPONENTS
+// ══════════════════════════════════════════════════
+
+function StepBadge({ num, title }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div className="step-badge">{num}</div>
+      <span style={{ color: "#F8FAFC", fontWeight: "bold", fontSize: 18 }}>{title}</span>
+    </div>
+  );
+}
+
+// Loss curve
+function LossChart({ history }) {
+  const canvasRef = useRef(null);
+  const W = 500, H = 200, PAD = 50;
+
+  useEffect(() => {
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.clearRect(0, 0, W, H);
+    if (history.length < 2) {
+      ctx.fillStyle = "#334155";
+      ctx.font = "14px -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Press Train to see the loss curve", W / 2, H / 2);
+      return;
+    }
+
+    const yMax = Math.max(...history) * 1.1;
+    const yMin = 0;
+    const toX = (i) => PAD + (i / (history.length - 1)) * (W - PAD - 20);
+    const toY = (v) => H - PAD - ((v - yMin) / (yMax - yMin)) * (H - PAD - 20);
+
+    // Grid
+    ctx.strokeStyle = "#1E293B";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = 20 + (i / 4) * (H - PAD - 20);
+      ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - 20, y); ctx.stroke();
+    }
+
+    // Loss curve
+    ctx.strokeStyle = "#F97316";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    history.forEach((v, i) => {
+      const x = toX(i), y = toY(v);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Current loss dot
+    const lastI = history.length - 1;
+    const lx = toX(lastI), ly = toY(history[lastI]);
+    ctx.fillStyle = "#F97316";
+    ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI * 2); ctx.fill();
+
+    // Labels
+    ctx.fillStyle = "#64748B";
+    ctx.font = "11px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Epoch", W / 2, H - 5);
+    ctx.save();
+    ctx.translate(12, H / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("Loss (MSE)", 0, 0);
+    ctx.restore();
+
+    // Tick labels
+    ctx.textAlign = "right";
+    for (let i = 0; i <= 4; i++) {
+      const val = yMin + (1 - i / 4) * (yMax - yMin);
+      const y = 20 + (i / 4) * (H - PAD - 20);
+      ctx.fillText(val.toFixed(2), PAD - 5, y + 4);
+    }
+    ctx.textAlign = "center";
+    const epochStep = Math.max(1, Math.floor(history.length / 5));
+    for (let i = 0; i < history.length; i += epochStep) {
+      ctx.fillText(String(i), toX(i), H - PAD + 16);
+    }
+    if (history.length > 1) ctx.fillText(String(history.length - 1), toX(history.length - 1), H - PAD + 16);
+
+  }, [history]);
+
+  return <canvas ref={canvasRef} width={W} height={H} style={{ background: "#0F172A", display: "block" }} />;
+}
+
+// Weight heatmap
+function WeightGrid({ weights, label, colors }) {
+  const featureNames = ["SqFt", "Beds", "Bath", "Year"];
+  const maxAbs = Math.max(...weights.flat().map(Math.abs), 0.01);
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 4, fontWeight: "bold" }}>{label}</div>
+      <div style={{ display: "grid", gridTemplateColumns: `60px repeat(${weights[0].length}, 1fr)`, gap: 2, fontSize: 10 }}>
+        <div></div>
+        {featureNames.slice(0, weights[0].length).map((n, i) => (
+          <div key={i} style={{ textAlign: "center", color: "#64748B", paddingBottom: 2 }}>{n}</div>
+        ))}
+        {weights.map((row, j) => (
+          <React.Fragment key={j}>
+            <div style={{ color: "#14B8A6", fontWeight: "bold", display: "flex", alignItems: "center" }} className="mono">h{j + 1}</div>
+            {row.map((v, i) => {
+              const intensity = Math.abs(v) / maxAbs;
+              const bg = v >= 0
+                ? `rgba(34, 197, 94, ${intensity * 0.7})`
+                : `rgba(239, 68, 68, ${intensity * 0.7})`;
+              return (
+                <div key={i} className="mono" style={{
+                  background: bg,
+                  borderRadius: 4,
+                  padding: "4px 2px",
+                  textAlign: "center",
+                  color: intensity > 0.3 ? "#F8FAFC" : "#94A3B8",
+                  fontSize: 10,
+                  fontWeight: "bold",
+                }}>
+                  {v.toFixed(2)}
+                </div>
+              );
+            })}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Effective feature influence — traces each feature through all hidden neurons
+function FeatureInfluence({ weights }) {
+  const featureNames = ["SqFt", "Beds", "Baths", "Year"];
+  const featureColors = ["#3B82F6", "#F97316", "#14B8A6", "#A78BFA"];
+
+  // For each feature, compute its net influence through all pathways
+  // influence_feature = sum over hidden neurons j of: hw[j][feature] * ow[j]
+  // (simplified — ignores ReLU gating, but gives the right intuition)
+  const influences = featureNames.map((_, fi) => {
+    const pathways = weights.hw.map((row, j) => ({
+      hiddenWeight: row[fi],
+      outputWeight: weights.ow[j],
+      product: row[fi] * weights.ow[j],
+      neuron: j,
+    }));
+    const net = pathways.reduce((sum, p) => sum + p.product, 0);
+    return { feature: featureNames[fi], color: featureColors[fi], pathways, net };
+  });
+
+  const maxNet = Math.max(...influences.map(inf => Math.abs(inf.net)), 0.01);
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontSize: 13, color: "#F8FAFC", fontWeight: "bold", marginBottom: 4 }}>
+        {"\uD83C\uDFAF"} Net Feature Influence — The Big Picture
+      </div>
+      <div className="explain" style={{ marginBottom: 6 }}>
+        You can't look at a single weight and know what the network "thinks" about a feature. Each feature takes <strong>three separate routes</strong> to the final prediction — one through each hidden neuron (h1, h2, h3). Each route has two weights chained together, and you have to multiply them to see what that route actually does. Then you add up all three routes to get the network's overall opinion.
+      </div>
+      <div className="explain" style={{ marginBottom: 6 }}>
+        <strong>Here's how one route works, step by step:</strong> Say SqFt has a hidden weight of <span style={{color:"#F87171"}}>-0.77</span> going into h1. That means "when SqFt goes up, the signal arriving at h1 goes <em>down</em>." But remember ReLU — if that signal drops below zero, h1 shuts off completely and sends nothing forward. If it stays positive, h1 passes it along (just weaker). Then h1's output weight (say <span style={{color:"#F87171"}}>-0.42</span>) determines what h1's signal does to the price. Negative output weight means "when h1 fires stronger, price goes <em>down</em>." So the route's net effect is: <span style={{color:"#F87171"}}>-0.77</span> {"\u00D7"} <span style={{color:"#F87171"}}>-0.42</span> = <span style={{color:"#4ADE80"}}>+0.32</span>. Negative times negative = positive! Through this roundabout path, more SqFt actually <em>increases</em> the price.
+      </div>
+      <div className="explain" style={{ marginBottom: 10 }}>
+        The bars below show all three routes added together for each feature. That sum is the network's <strong>true overall opinion</strong>. This is what makes neural networks different from linear regression — instead of one weight per feature, you get multiple indirect pathways that the network learns to combine.
+      </div>
+
+      {influences.map((inf, fi) => (
+        <div key={fi} style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span className="mono" style={{ fontSize: 12, fontWeight: "bold", color: inf.color, width: 40 }}>{inf.feature}</span>
+            <div style={{ flex: 1, position: "relative", height: 22, background: "#0F172A", borderRadius: 4, overflow: "hidden" }}>
+              {/* Center line */}
+              <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "#334155" }} />
+              {/* Bar */}
+              <div style={{
+                position: "absolute",
+                top: 2, bottom: 2,
+                left: inf.net >= 0 ? "50%" : `${50 + (inf.net / maxNet) * 45}%`,
+                width: `${Math.abs(inf.net / maxNet) * 45}%`,
+                background: inf.net >= 0 ? "rgba(34, 197, 94, 0.7)" : "rgba(239, 68, 68, 0.7)",
+                borderRadius: 3,
+                transition: "all 0.3s ease",
+              }} />
+            </div>
+            <span className="mono" style={{ fontSize: 11, fontWeight: "bold", width: 50, textAlign: "right", color: inf.net >= 0 ? "#22C55E" : "#EF4444" }}>
+              {inf.net >= 0 ? "+" : ""}{inf.net.toFixed(2)}
+            </span>
+          </div>
+          {/* Pathway breakdown */}
+          <div style={{ display: "flex", gap: 6, marginLeft: 48 }}>
+            {inf.pathways.map((p, j) => (
+              <div key={j} className="mono" style={{
+                fontSize: 9, padding: "2px 6px", borderRadius: 3,
+                background: "#0F172A", color: "#64748B",
+              }}>
+                <span style={{ color: "#94A3B8" }}>h{j + 1}:</span>{" "}
+                <span style={{ color: p.hiddenWeight >= 0 ? "#4ADE80" : "#F87171" }}>{p.hiddenWeight.toFixed(2)}</span>
+                {" \u00D7 "}
+                <span style={{ color: p.outputWeight >= 0 ? "#4ADE80" : "#F87171" }}>{p.outputWeight.toFixed(2)}</span>
+                {" = "}
+                <span style={{ color: p.product >= 0 ? "#22C55E" : "#EF4444", fontWeight: "bold" }}>{p.product >= 0 ? "+" : ""}{p.product.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="callout" style={{ marginTop: 10 }}>
+        <strong>How to read the bars:</strong> Green bar pointing right = "more of this feature raises the price." Red bar pointing left = "more of this feature lowers the price." The longer the bar, the stronger the opinion. Below each bar, the three pathway tags show the actual math for each hidden neuron route: <span className="mono" style={{fontSize:11}}>hidden weight {"\u00D7"} output weight = route contribution</span>. All three routes get added together to make the bar.
+      </div>
+      <div className="callout warn" style={{ marginTop: 8 }}>
+        <strong>Important caveat — ReLU changes things!</strong> This chart shows the "theoretical" influence assuming every neuron is active. But remember, each hidden neuron has a ReLU activation function — a gatekeeper that says "if the signal arriving here is positive, pass it through; if negative, output zero." That means some pathways might be <em>shut off entirely</em> for certain houses. A neuron that's "off" contributes nothing, no matter what its weights say. So the real influence can vary from house to house — the network's opinion isn't fixed, it depends on the input. That's the source of neural networks' power over simple linear models.
+      </div>
+    </div>
+  );
+}
+
+// Single training example visualization
+function TrainingExample({ house, weights, idx }) {
+  const x = scaleFeatures(house);
+  const target = (house.price - priceMean) / priceStd;
+  const { hiddenRaw, hiddenAct, out } = forwardPass(x, weights);
+  const predictedPrice = out * priceStd + priceMean;
+  const error = predictedPrice - house.price;
+  const absError = Math.abs(error);
+
+  return (
+    <div className="card" style={{ padding: 12, borderLeft: `3px solid ${absError < 20000 ? "#22C55E" : absError < 50000 ? "#FBBF24" : "#EF4444"}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <span style={{ fontSize: 12, color: "#94A3B8" }}>House #{idx + 1}: {Math.round(house.sqft).toLocaleString()} sqft, {house.beds} bed, {house.baths} bath, {house.year}</span>
+      </div>
+      <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 10, color: "#64748B" }}>Actual Price</div>
+          <div className="mono" style={{ fontSize: 14, fontWeight: "bold", color: "#22C55E" }}>${Math.round(house.price).toLocaleString()}</div>
+        </div>
+        <div style={{ fontSize: 16, color: "#64748B" }}>vs</div>
+        <div>
+          <div style={{ fontSize: 10, color: "#64748B" }}>Model Predicts</div>
+          <div className="mono" style={{ fontSize: 14, fontWeight: "bold", color: "#F97316" }}>${Math.round(predictedPrice).toLocaleString()}</div>
+        </div>
+        <div style={{ fontSize: 16, color: "#64748B" }}>=</div>
+        <div>
+          <div style={{ fontSize: 10, color: "#64748B" }}>Error</div>
+          <div className="mono" style={{ fontSize: 14, fontWeight: "bold", color: absError < 20000 ? "#22C55E" : absError < 50000 ? "#FBBF24" : "#EF4444" }}>
+            {error >= 0 ? "+" : ""}${Math.round(error).toLocaleString()}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function App() {
+  const [weights, setWeights] = useState(() => initWeights(makeRng(7)));
+  const [lossHistory, setLossHistory] = useState(() => [computeLoss(initWeights(makeRng(7)), TRAINING_DATA)]);
+  const [epoch, setEpoch] = useState(0);
+  const [isTraining, setIsTraining] = useState(false);
+  const [speed, setSpeed] = useState(200);
+  const timerRef = useRef(null);
+  const weightsRef = useRef(weights);
+  const epochRef = useRef(epoch);
+  const lossRef = useRef(lossHistory);
+
+  weightsRef.current = weights;
+  epochRef.current = epoch;
+  lossRef.current = lossHistory;
+
+  const lr = 0.05;
+
+  const doOneEpoch = useCallback(() => {
+    const newW = trainStep(weightsRef.current, TRAINING_DATA, lr);
+    const newLoss = computeLoss(newW, TRAINING_DATA);
+    setWeights(newW);
+    setEpoch(e => e + 1);
+    setLossHistory(h => [...h, newLoss]);
+  }, []);
+
+  const startTraining = useCallback(() => {
+    setIsTraining(true);
+    timerRef.current = setInterval(() => {
+      if (epochRef.current >= 150) {
+        clearInterval(timerRef.current);
+        setIsTraining(false);
+        return;
+      }
+      doOneEpoch();
+    }, speed);
+  }, [speed, doOneEpoch]);
+
+  const stopTraining = useCallback(() => {
+    clearInterval(timerRef.current);
+    setIsTraining(false);
+  }, []);
+
+  const resetAll = useCallback(() => {
+    clearInterval(timerRef.current);
+    setIsTraining(false);
+    const w0 = initWeights(makeRng(7));
+    setWeights(w0);
+    setEpoch(0);
+    setLossHistory([computeLoss(w0, TRAINING_DATA)]);
+  }, []);
+
+  useEffect(() => () => clearInterval(timerRef.current), []);
+
+  const currentLoss = lossHistory[lossHistory.length - 1];
+  const initialLoss = lossHistory[0];
+  const improvement = initialLoss > 0 ? ((1 - currentLoss / initialLoss) * 100) : 0;
+
+  return (
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: 16 }}>
+      {/* Header */}
+      <div style={{ textAlign: "center", marginBottom: 16 }}>
+        <h1 style={{ fontSize: 32, fontWeight: "bold", marginBottom: 4 }}>Neural Network Training</h1>
+        <p style={{ fontSize: 14, color: "#F97316" }}>Watch a network learn from its mistakes — epoch by epoch</p>
+      </div>
+
+      {/* Context */}
+      <div style={{ background: "linear-gradient(135deg, #1A2744, #2D1B10)", border: "1px solid #F97316", borderRadius: 12, padding: 20, marginBottom: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 20, marginBottom: 6 }}><strong>This Is the Training Phase</strong></div>
+        <p style={{ fontSize: 13, color: "#94A3B8", maxWidth: 740, margin: "0 auto", lineHeight: 1.6 }}>
+          The other Neural Network explorer showed you a <em>trained</em> model making predictions. This one shows you <strong style={{ color: "#F8FAFC" }}>how the model gets trained in the first place</strong>. The network starts with <strong style={{ color: "#EF4444" }}>random weights</strong> — it knows nothing and makes terrible predictions. Then it sees training houses one by one, measures how wrong it was, and <strong style={{ color: "#F97316" }}>adjusts its weights a tiny bit</strong> to be less wrong next time. After seeing all houses many times (many "epochs"), the weights converge to values that produce good predictions.
+        </p>
+      </div>
+
+      {/* ── TRAINING CONTROLS ── */}
+      <div className="card" style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
+        {!isTraining ? (
+          <button className="ctrl-btn" onClick={epoch >= 150 ? resetAll : startTraining}
+            style={{ background: "#F97316", color: "#0B1120" }}>
+            {epoch === 0 ? "\u25B6 Start Training" : epoch >= 150 ? "\u21BB Reset & Start Over" : "\u25B6 Resume Training"}
+          </button>
+        ) : (
+          <button className="ctrl-btn" onClick={stopTraining}
+            style={{ background: "#EF4444", color: "#F8FAFC" }}>
+            {"\u25A0 Pause"}
+          </button>
+        )}
+        <button className="ctrl-btn" onClick={doOneEpoch} disabled={isTraining || epoch >= 150}
+          style={{ background: "#1A2744", color: isTraining ? "#334155" : "#F97316", border: "1px solid #334155" }}>
+          +1 Epoch
+        </button>
+        <button className="ctrl-btn" onClick={resetAll}
+          style={{ background: "#1A2744", color: "#94A3B8", border: "1px solid #334155" }}>
+          {"\u21BB Reset"}
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, color: "#64748B" }}>Speed:</span>
+          {[{ label: "Slow", ms: 400 }, { label: "Medium", ms: 200 }, { label: "Fast", ms: 50 }].map(s => (
+            <button key={s.ms} onClick={() => { setSpeed(s.ms); if (isTraining) { clearInterval(timerRef.current); timerRef.current = setInterval(doOneEpoch, s.ms); } }}
+              style={{ padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: "bold", background: speed === s.ms ? "#F97316" : "#1A2744", color: speed === s.ms ? "#0B1120" : "#64748B", border: `1px solid ${speed === s.ms ? "#F97316" : "#334155"}` }}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── STATS BAR ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+        <div className="card" style={{ textAlign: "center", padding: 12 }}>
+          <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: 1 }}>Epoch</div>
+          <div className="mono" style={{ fontSize: 28, fontWeight: "bold", color: "#F8FAFC" }}>{epoch}</div>
+          <div style={{ fontSize: 10, color: "#475569" }}>of 150 max</div>
+        </div>
+        <div className="card" style={{ textAlign: "center", padding: 12 }}>
+          <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: 1 }}>Current Loss</div>
+          <div className="mono" style={{ fontSize: 28, fontWeight: "bold", color: currentLoss > 0.5 ? "#EF4444" : currentLoss > 0.15 ? "#FBBF24" : "#22C55E" }}>
+            {currentLoss.toFixed(3)}
+          </div>
+          <div style={{ fontSize: 10, color: "#475569" }}>mean squared error</div>
+        </div>
+        <div className="card" style={{ textAlign: "center", padding: 12 }}>
+          <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: 1 }}>Improvement</div>
+          <div className="mono" style={{ fontSize: 28, fontWeight: "bold", color: improvement > 0 ? "#22C55E" : "#64748B" }}>
+            {improvement > 0 ? improvement.toFixed(0) + "%" : "—"}
+          </div>
+          <div style={{ fontSize: 10, color: "#475569" }}>from initial loss</div>
+        </div>
+        <div className="card" style={{ textAlign: "center", padding: 12 }}>
+          <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: 1 }}>Total Weights</div>
+          <div className="mono" style={{ fontSize: 28, fontWeight: "bold", color: "#A78BFA" }}>19</div>
+          <div style={{ fontSize: 10, color: "#475569" }}>all adjusting each epoch</div>
+        </div>
+      </div>
+
+      {/* ── STEP 1: LOSS CURVE ── */}
+      <div className="section">
+        <StepBadge num={1} title="The Loss Curve — Is the Network Learning?" />
+        <div className="explain">
+          The loss curve is the <strong>single most important chart in all of machine learning</strong>. It shows the network's average error over time. When the line goes down, the network is learning — its predictions are getting closer to the real prices. When the line flattens out, the network has learned as much as it can.
+        </div>
+        <div className="explain">
+          The <span className="hl">loss</span> (mean squared error) measures how far off the predictions are, on average, from the actual prices — squared so that big mistakes count more. At epoch 0, the loss is high because the weights are random garbage. With each epoch, backpropagation nudges the weights to reduce this number.
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+          <LossChart history={lossHistory} />
+        </div>
+        <div className="callout warn">
+          <strong>Watch for the pattern:</strong> The loss drops steeply at first (easy improvements), then gradually levels off (diminishing returns). Early epochs fix the biggest errors. Later epochs make tiny refinements. This is true for virtually every neural network ever trained.
+        </div>
+      </div>
+
+      {/* ── STEP 2: WEIGHTS EVOLVING ── */}
+      <div className="section">
+        <StepBadge num={2} title="Weight Evolution — What's Changing?" />
+        <div className="explain">
+          Below is a heatmap of <strong>every weight in the network right now</strong>. Green means the weight is positive, red means negative, and the intensity shows the magnitude. At epoch 0, these are random. As training progresses, watch them organize into meaningful patterns. <strong>But be careful</strong> — you can't look at a single green or red cell and say "this feature raises/lowers the price." A hidden weight is only half the story. You also need to see the output weight for that neuron (shown on the right). The "Net Feature Influence" panel below does this full math for you.
+        </div>
+        <div className="explain">
+          Each hidden node develops a "personality" — its own unique combination of features it responds to. One might learn a big positive weight for SqFt and a big negative weight for Year. Another might focus mainly on Beds and Baths. <strong>The network is discovering which features matter and how they interact</strong> — all by itself, just from seeing examples and adjusting weights to reduce error. The output layer then learns how to blend these different "perspectives" into a single price prediction.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div>
+            <WeightGrid weights={weights.hw} label="Hidden Layer Weights (input → hidden)" />
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 4, fontWeight: "bold" }}>Hidden Biases</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {weights.hb.map((b, j) => (
+                  <div key={j} className="mono" style={{
+                    background: b >= 0 ? `rgba(34, 197, 94, ${Math.min(Math.abs(b), 1) * 0.7})` : `rgba(239, 68, 68, ${Math.min(Math.abs(b), 1) * 0.7})`,
+                    borderRadius: 4, padding: "4px 8px", fontSize: 10, fontWeight: "bold",
+                    color: Math.abs(b) > 0.2 ? "#F8FAFC" : "#94A3B8",
+                  }}>
+                    h{j + 1}: {b.toFixed(3)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 4, fontWeight: "bold" }}>Output Layer Weights (hidden → output)</div>
+            <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+              {weights.ow.map((w, i) => {
+                const maxAbs = Math.max(...weights.ow.map(Math.abs), 0.01);
+                const intensity = Math.abs(w) / maxAbs;
+                return (
+                  <div key={i} className="mono" style={{
+                    background: w >= 0 ? `rgba(34, 197, 94, ${intensity * 0.7})` : `rgba(239, 68, 68, ${intensity * 0.7})`,
+                    borderRadius: 4, padding: "6px 12px", fontSize: 11, fontWeight: "bold",
+                    color: intensity > 0.3 ? "#F8FAFC" : "#94A3B8",
+                  }}>
+                    h{i + 1}→out: {w.toFixed(3)}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 4, fontWeight: "bold" }}>Output Bias</div>
+            <div className="mono" style={{ fontSize: 11, color: "#A78BFA" }}>{weights.ob.toFixed(4)}</div>
+
+            <div className="callout teal" style={{ marginTop: 16 }}>
+              <strong>What to look for:</strong> At epoch 0, the heatmap is a random mess. By epoch 50+, you should see clear patterns — some cells get intensely green or red (strong opinions) while others fade toward zero (the network learned to ignore that connection). This is the network <em>learning what matters</em>.
+            </div>
+          </div>
+        </div>
+
+        <FeatureInfluence weights={weights} />
+      </div>
+
+      {/* ── STEP 3: TRAINING EXAMPLES ── */}
+      <div className="section">
+        <StepBadge num={3} title="Predictions on Training Data — Getting Better?" />
+        <div className="explain">
+          Here's how the network (with its current weights) predicts the price for each training house. The <span style={{ color: "#22C55E" }}>green</span> border means the error is small (under $20K), <span style={{ color: "#FBBF24" }}>yellow</span> means moderate (under $50K), and <span style={{ color: "#EF4444" }}>red</span> means the network is still way off. At epoch 0, everything should be red. As training progresses, watch the cards turn green.
+        </div>
+        <div className="callout">
+          <strong>This is what "learning" looks like.</strong> Each epoch, the network's weights shift to make these errors smaller. It's not memorizing individual houses — it's finding <em>patterns</em> that generalize across all of them. Backpropagation traces each error back to the specific weights that caused it, and gradient descent nudges those weights in the right direction.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, maxHeight: 400, overflowY: "auto", padding: 4 }}>
+          {TRAINING_DATA.slice(0, 10).map((house, i) => (
+            <TrainingExample key={i} house={house} weights={weights} idx={i} />
+          ))}
+        </div>
+      </div>
+
+      {/* ── STEP 4: THE TRAINING LOOP EXPLAINED ── */}
+      <div className="section">
+        <StepBadge num={4} title="What Happens Each Epoch" />
+        <div className="explain">
+          Every time you see the epoch counter tick up by one, here's what just happened behind the scenes:
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "10px 14px", marginBottom: 16 }}>
+          {[
+            { n: "1", title: "Forward Pass", desc: "Every training house is fed through the network with the current weights. Each house gets a predicted price.", color: "#14B8A6" },
+            { n: "2", title: "Loss Calculation", desc: "For each house, compute (actual - predicted)². Average all of them to get the mean squared error. This single number tells us how wrong the network is overall.", color: "#F97316" },
+            { n: "3", title: "Backpropagation", desc: "Trace the error backward through the network. For each of the 19 weights, calculate: \"if I increased this weight by a tiny amount, would the loss go up or down?\" This gives us the gradient — the direction and magnitude of blame.", color: "#EF4444" },
+            { n: "4", title: "Weight Update", desc: "Nudge every weight in the direction that reduces the loss: new_weight = old_weight - learning_rate × gradient. The learning rate (0.05 here) controls how big each step is. Too big = chaos. Too small = too slow.", color: "#A78BFA" },
+          ].map((s, i) => (
+            <React.Fragment key={i}>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", background: s.color, color: "#0B1120", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 13 }}>{s.n}</div>
+              <div>
+                <span style={{ fontWeight: "bold", color: s.color }}>{s.title}: </span>
+                <span style={{ color: "#CBD5E1", fontSize: 13 }}>{s.desc}</span>
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="callout red">
+          <strong>All 19 weights update simultaneously</strong> at the end of each epoch. No single weight "goes first." The network considers the impact of every weight on the overall error and adjusts them all at once. This is what makes neural network training fundamentally different from a human tweaking dials one at a time.
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ textAlign: "center", marginTop: 20, fontSize: 12, color: "#475569", lineHeight: 1.6, maxWidth: 680, margin: "20px auto 0" }}>
+        <strong style={{ color: "#94A3B8" }}>This is a real (tiny) neural network training in your browser.</strong> The weights start random and are genuinely being optimized using numerical gradients on 20 training houses. It's the same process that happens in scikit-learn's MLPRegressor — just smaller scale so you can watch every step.
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
