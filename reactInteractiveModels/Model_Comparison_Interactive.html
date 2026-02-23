@@ -27,7 +27,7 @@
 const { useState, useMemo, useRef, useEffect } = React;
 
 // ═══ LINEAR REGRESSION ═══
-const LR_COEFS = { sqft: 125, beds: 15000, baths: 22000, year: 1200, intercept: -2150000 };
+const LR_COEFS = { sqft: 80, beds: 8000, baths: 12000, year: 120, intercept: -125000 };
 function lrPredict(f) {
   return LR_COEFS.sqft * f.sqft + LR_COEFS.beds * f.beds + LR_COEFS.baths * f.baths + LR_COEFS.year * f.year + LR_COEFS.intercept;
 }
@@ -60,18 +60,22 @@ function rfPredict(f) {
 }
 
 // ═══ NEURAL NETWORK (MLP) ═══
-const HW = [[0.80,-0.30,0.50,0.10],[0.15,0.70,0.60,-0.20],[-0.40,0.10,-0.10,0.85],[0.55,0.45,0.35,0.30],[-0.60,0.80,-0.25,0.05]];
-const HB = [0.20,-0.10,0.15,-0.30,0.25];
-const OW = [0.45,0.30,0.35,0.25,-0.15];
+// Hidden neuron 2 has negative feature weights + high bias → activates for SMALL houses
+// Other neurons have positive weights → activate for LARGE houses
+// This lets the NN learn both ends of the price range
+const HW = [[0.50,0.10,0.10,0.20],[0.10,0.40,0.35,0.10],[-0.40,-0.10,-0.10,-0.30],[0.30,0.25,0.20,0.25],[0.15,-0.10,0.10,0.45]];
+const HB = [0.60,0.50,0.50,0.10,0.40];
+const OW = [0.38,0.22,-1.40,0.15,0.32];
 const OB = 0.10;
-const FS = [{m:1800,s:600},{m:3.2,s:1.1},{m:2.1,s:0.8},{m:1990,s:25}];
+const FS = [{m:2000,s:800},{m:3,s:1.2},{m:2,s:1},{m:1985,s:30}];
 function nnPredict(f) {
   const vals = [f.sqft, f.beds, f.baths, f.year];
   const sc = vals.map((v,i) => (v - FS[i].m) / FS[i].s);
   const hr = HW.map((ws,j) => ws.reduce((a,w,i) => a + w*sc[i], 0) + HB[j]);
   const ha = hr.map(x => Math.max(0, x));
-  const out = OW.reduce((a,w,i) => a + w*ha[i], 0) + OB;
-  return out * 120000 + 285000;
+  const raw = OW.reduce((a,w,i) => a + w*ha[i], 0) + OB;
+  const sig = 1 / (1 + Math.exp(-raw));
+  return sig * 380000 + 100000;
 }
 
 // ═══ Bar Chart Component ═══
@@ -147,13 +151,13 @@ function App() {
     const rf = rfPredict(f);
     return [
       { name: "Linear Regression", price: lrPredict(f), color: "#3B82F6",
-        desc: "Multiplied each feature by a coefficient and added them up. One straight-line equation." },
+        desc: "Multiplied each feature by a coefficient ($" + LR_COEFS.sqft + "/sqft, $" + LR_COEFS.beds.toLocaleString() + "/bed, $" + LR_COEFS.baths.toLocaleString() + "/bath, $" + LR_COEFS.year + "/year) and added them up." },
       { name: "Decision Tree", price: dtPredict(f), color: "#10B981",
         desc: "Followed a path of yes/no questions. Prediction = average of training houses in the leaf." },
       { name: "Random Forest", price: rf.avg, color: "#8B5CF6",
         desc: `Averaged 5 trees: $${rf.individual.map(v => (v/1000).toFixed(0) + "K").join(", $")}. Spread: $${(Math.max(...rf.individual) - Math.min(...rf.individual)).toLocaleString()}.` },
       { name: "Neural Network", price: nnPredict(f), color: "#14B8A6",
-        desc: "Forward pass through input → hidden (5 nodes + ReLU) → output. Captures non-linear patterns." },
+        desc: "Forward pass through input → hidden (5 ReLU nodes) → sigmoid output. Captures non-linear patterns and naturally bounds predictions." },
     ];
   }, [sqft, beds, baths, year]);
 

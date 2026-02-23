@@ -33,11 +33,11 @@ const { useState, useMemo, useRef, useEffect } = React;
 
 // ── "Trained" coefficients (simulated) ──
 const COEFFICIENTS = {
-  sqft: 125.0,
-  beds: 15000,
-  baths: 22000,
-  year: 1200,
-  intercept: -2150000
+  sqft: 80,
+  beds: 8000,
+  baths: 12000,
+  year: 120,
+  intercept: -125000
 };
 
 const FEATURE_NAMES = ["Sq. Ft.", "Beds", "Baths", "Year"];
@@ -108,21 +108,18 @@ function ScatterPlot({ points, userX, userY, xLabel, xMin, xMax }) {
       }
     });
 
-    // Regression line (simplified: for the active feature, holding others constant)
+    // Regression line: vary the selected feature from xMin to xMax,
+    // holding all other features at their training-data averages
+    const featureIdx = points._featureIdx;
+    const trainMeans = [2550, 3, 2.5, 1980]; // avg values from training data generation
     ctx.strokeStyle = "#3B82F6";
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    const lx1 = toCanvasX(xMin);
-    const ly1 = toCanvasY(predict(
-      ...[xMin, xMin, xMin, xMin].map((_, idx) =>
-        idx === points._featureIdx ? xMin : [0, 0, 0, 0][idx]
-      )
-    ));
-    // Just draw a straight line through scatter
-    const lineY1 = yMin + (xMin - xMin) / (xMax - xMin) * (yMax - yMin) * 0.4 + 100000;
-    const lineY2 = yMin + (xMax - xMin) / (xMax - xMin) * (yMax - yMin) * 0.6 + 100000;
-    ctx.moveTo(toCanvasX(xMin), toCanvasY(lineY1));
-    ctx.lineTo(toCanvasX(xMax), toCanvasY(lineY2));
+    const buildArgs = (xVal) => trainMeans.map((m, idx) => idx === featureIdx ? xVal : m);
+    const regY1 = predict(...buildArgs(xMin));
+    const regY2 = predict(...buildArgs(xMax));
+    ctx.moveTo(toCanvasX(xMin), toCanvasY(Math.max(yMin, Math.min(yMax, regY1))));
+    ctx.lineTo(toCanvasX(xMax), toCanvasY(Math.max(yMin, Math.min(yMax, regY2))));
     ctx.stroke();
 
     // User point
@@ -189,7 +186,7 @@ function CoefChart({ features, contributions }) {
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(midX, 10); ctx.lineTo(midX, H - 10); ctx.stroke();
 
-    const labels = ["Sq. Ft.", "Bedrooms", "Bathrooms", "Year Built", "Intercept"];
+    const labels = ["Sq. Ft.", "Bedrooms", "Bathrooms", "Year Built"];
 
     contributions.forEach((c, i) => {
       const y = 16 + i * (barH + gap);
@@ -222,7 +219,7 @@ function CoefChart({ features, contributions }) {
     ctx.fillStyle = "#64748B";
     ctx.font = "10px -apple-system, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("$0", midX, H - 2);
+    ctx.fillText("avg", midX, H - 2);
 
   }, [contributions]);
 
@@ -238,12 +235,12 @@ function App() {
   const [scatterFeature, setScatterFeature] = useState(0);
 
   const price = useMemo(() => predict(sqft, beds, baths, year), [sqft, beds, baths, year]);
+  const TRAIN_MEANS = [2550, 3, 2.5, 1980];
   const contributions = useMemo(() => [
-    COEFFICIENTS.sqft * sqft,
-    COEFFICIENTS.beds * beds,
-    COEFFICIENTS.baths * baths,
-    COEFFICIENTS.year * year,
-    COEFFICIENTS.intercept
+    COEFFICIENTS.sqft * (sqft - TRAIN_MEANS[0]),
+    COEFFICIENTS.beds * (beds - TRAIN_MEANS[1]),
+    COEFFICIENTS.baths * (baths - TRAIN_MEANS[2]),
+    COEFFICIENTS.year * (year - TRAIN_MEANS[3]),
   ], [sqft, beds, baths, year]);
 
   const scatterPoints = useMemo(() => {
@@ -326,7 +323,7 @@ function App() {
           That's the entire model. No layers, no neurons, no activation functions. Just: <strong>price = (coef₁ × feature₁) + (coef₂ × feature₂) + ... + intercept</strong>.
         </div>
         <div className="callout">
-          <strong>The coefficient tells you the rate of change.</strong> A coefficient of <span className="mono" style={{color:"#22C55E"}}>$125/sqft</span> means every additional square foot adds $125 to the predicted price — always, no matter what. That "always, no matter what" is both the strength (simplicity) and the limitation (real life is more complicated).
+          <strong>The coefficient tells you the rate of change.</strong> A coefficient of <span className="mono" style={{color:"#22C55E"}}>$80/sqft</span> means every additional square foot adds $80 to the predicted price — always, no matter what. That "always, no matter what" is both the strength (simplicity) and the limitation (real life is more complicated).
         </div>
 
         {/* Formula breakdown */}
@@ -361,7 +358,7 @@ function App() {
           </div>
         </div>
         <div className="callout warn-callout">
-          <strong>Try it:</strong> Add one bedroom and watch the price jump by exactly $15,000. Add another — another $15,000. It's always the same increment. Linear regression assumes each feature has a constant, additive effect. In reality, a 5th bedroom in a 900 sqft house might actually <em>hurt</em> the price — but linear regression can't capture that.
+          <strong>Try it:</strong> Add one bedroom and watch the price jump by exactly $8,000. Add another — another $8,000. It's always the same increment. Linear regression assumes each feature has a constant, additive effect. In reality, a 5th bedroom in a 900 sqft house might actually <em>hurt</em> the price — but linear regression can't capture that.
         </div>
       </div>
 
@@ -369,16 +366,16 @@ function App() {
       <div className="section">
         <StepBadge num={2} title="What's Driving the Price?" />
         <div className="explain">
-          Each feature's contribution = its coefficient × its value. The bar chart below shows <strong>how much each feature adds or subtracts</strong> from the final price. The intercept is a large negative number that acts as a baseline — the coefficients for the features bring the price back up.
+          Each bar shows <strong>how much a feature pushes the price above or below the average house</strong>. The baseline is a typical training house (~2,550 sqft, 3 beds, 2.5 baths, built ~1980). Bars to the right mean your house scores <strong style={{ color: "#22C55E" }}>above average</strong> on that feature; bars to the left mean <strong style={{ color: "#EF4444" }}>below average</strong>.
         </div>
         <div className="explain">
-          Notice that <strong>square footage dominates</strong>. At 1,800 sqft × $125/sqft, it contributes $225,000 all by itself. This is one way to understand feature importance in linear regression — features with large coefficients × large values contribute most.
+          This is the key insight: contribution = coefficient × (your value − average value). A feature only moves the price when <strong>your house differs from the average</strong>.
         </div>
         <div style={{ display: "flex", justifyContent: "center" }}>
           <CoefChart features={featureVals} contributions={[...contributions]} />
         </div>
         <div className="callout warn-callout" style={{ marginTop: 12 }}>
-          <strong>Try it:</strong> Drag Year Built from 1920 to 2025 and watch the Year bar grow. Then drag Bedrooms from 1 to 6 — notice the Bedrooms bar grows too, but much less dramatically. This tells you square footage and year have the biggest influence on price in this model.
+          <strong>Try it:</strong> Drag Year Built from 1920 to 2025 — at 1920 the bar is deep red (60 years below average), and at 2025 it swings fully green. Now try Square Footage — moving from 600 to 5,000 sqft creates the biggest swing of all. This tells you which features have the most power to move the price in this model.
         </div>
       </div>
 

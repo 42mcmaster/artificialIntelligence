@@ -52,7 +52,7 @@ function generateTrainingData() {
     const baths = 1 + Math.floor(rng() * 4);
     const year = 1935 + Math.floor(rng() * 85);
     // "True" price with some noise
-    const price = 50 * sqft + 12000 * beds + 18000 * baths + 900 * year - 1600000 + (rng() - 0.5) * 40000;
+    const price = 80 * sqft + 8000 * beds + 12000 * baths + 120 * year - 125000 + (rng() - 0.5) * 40000;
     houses.push({ sqft, beds, baths, year, price: Math.max(60000, price) });
   }
   return houses;

@@ -40,27 +40,30 @@
 const { useState, useMemo } = React;
 
 // ── FIXED weights & biases (these are "learned" and frozen) ──
+// Hidden neuron 2 has negative feature weights + high bias → activates for SMALL houses
+// Other neurons have positive weights → activate for LARGE houses
 const HIDDEN_WEIGHTS = [
-  [0.80, -0.30,  0.50,  0.10],
-  [0.15,  0.70,  0.60, -0.20],
-  [-0.40,  0.10, -0.10,  0.85],
-  [0.55,  0.45,  0.35,  0.30],
-  [-0.60,  0.80, -0.25,  0.05],
+  [0.50,  0.10,  0.10,  0.20],
+  [0.10,  0.40,  0.35,  0.10],
+  [-0.40, -0.10, -0.10, -0.30],
+  [0.30,  0.25,  0.20,  0.25],
+  [0.15, -0.10,  0.10,  0.45],
 ];
-const HIDDEN_BIASES = [0.20, -0.10, 0.15, -0.30, 0.25];
-const OUTPUT_WEIGHTS = [0.45, 0.30, 0.35, 0.25, -0.15];
+const HIDDEN_BIASES = [0.60, 0.50, 0.50, 0.10, 0.40];
+const OUTPUT_WEIGHTS = [0.38, 0.22, -1.40, 0.15, 0.32];
 const OUTPUT_BIAS = 0.10;
 const FEATURE_STATS = [
-  { mean: 1800, std: 600 },
-  { mean: 3.2, std: 1.1 },
-  { mean: 2.1, std: 0.8 },
-  { mean: 1990, std: 25 },
+  { mean: 2000, std: 800 },
+  { mean: 3, std: 1.2 },
+  { mean: 2, std: 1 },
+  { mean: 1985, std: 30 },
 ];
-const PRICE_MEAN = 285000;
-const PRICE_STD = 120000;
+const PRICE_SCALE = 380000;
+const PRICE_OFFSET = 100000;
 
 function scale(val, idx) { return (val - FEATURE_STATS[idx].mean) / FEATURE_STATS[idx].std; }
 function relu(x) { return Math.max(0, x); }
+function sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
 
 function forwardPass(features) {
   const scaled = features.map((v, i) => scale(v, i));
@@ -69,8 +72,9 @@ function forwardPass(features) {
   );
   const hiddenActivated = hiddenRaw.map(relu);
   const outputRaw = OUTPUT_WEIGHTS.reduce((acc, w, i) => acc + w * hiddenActivated[i], 0) + OUTPUT_BIAS;
-  const price = outputRaw * PRICE_STD + PRICE_MEAN;
-  return { scaled, hiddenRaw, hiddenActivated, outputRaw, price };
+  const outputSig = sigmoid(outputRaw);
+  const price = outputSig * PRICE_SCALE + PRICE_OFFSET;
+  return { scaled, hiddenRaw, hiddenActivated, outputRaw, outputSig, price };
 }
 
 function valColor(v) { return v > 0 ? "#22C55E" : v < 0 ? "#EF4444" : "#64748B"; }
@@ -206,7 +210,7 @@ function App() {
             ))}
           </div>
           <div className="callout warn-callout" style={{ marginTop: 12 }}>
-            <strong>Try it:</strong> Drag Square Footage to 1,800 (the mean). Its scaled value becomes ~0.00 — right at center. Now drag it to 3,000 — it goes positive, meaning "above average." Drag it to 600 — it goes negative, meaning "below average." That's all scaling does.
+            <strong>Try it:</strong> Drag Square Footage to 2,000 (the mean). Its scaled value becomes ~0.00 — right at center. Now drag it to 3,000 — it goes positive, meaning "above average." Drag it to 600 — it goes negative, meaning "below average." That's all scaling does.
           </div>
         </div>
       )}
@@ -263,9 +267,9 @@ function App() {
               const focusDesc = [
                 "Pays most attention to square footage",
                 "Focuses on bedrooms and bathrooms",
-                "Cares most about year built",
+                "Activates for small houses (negative weights)",
                 "Balanced — weighs everything fairly evenly",
-                "Compares bedrooms against square footage",
+                "Cares most about year built",
               ];
               return (
                 <div key={j} className="card" style={{ padding: 12 }}>
@@ -292,7 +296,7 @@ function App() {
             })}
           </div>
           <div className="callout warn-callout" style={{ marginTop: 12 }}>
-            <strong>Try it:</strong> Drag Square Footage way up. Watch h1 (which weighs sq ft heavily at <span style={{color:"#A78BFA"}}>0.80</span>) react strongly, while h3 (which barely cares about sq ft at <span style={{color:"#A78BFA"}}>-0.40</span>) might even go negative. Each node has learned to "look at" the house differently.
+            <strong>Try it:</strong> Drag Square Footage way up. Watch h1 (which weighs sq ft at <span style={{color:"#A78BFA"}}>0.50</span>) react strongly, while h3 (which has a <em>negative</em> sq ft weight of <span style={{color:"#A78BFA"}}>-0.40</span>) actually decreases — it's the "small house detector." Each node has learned to "look at" the house differently.
           </div>
         </div>
       )}
@@ -353,13 +357,13 @@ function App() {
         <div className="section">
           <StepBadge num={5} title="Output Layer — Prediction" />
           <div className="explain">
-            All the activated hidden node outputs now flow into <strong>one final output node</strong>. This node works the same way as the hidden nodes — it multiplies each incoming value by a weight, sums them up, and adds a bias. The result is the network's prediction.
+            All the activated hidden node outputs now flow into <strong>one final output node</strong>. This node works the same way as the hidden nodes — it multiplies each incoming value by a weight, sums them up, and adds a bias.
           </div>
           <div className="explain">
-            One crucial difference: the output node <strong>does NOT use an activation function</strong>. The raw weighted sum IS the prediction. Why? Because we need the output to be any number — a house could cost $50,000 or $5 million. If we squashed it through ReLU, we'd clip negative predictions to zero, limiting what the network can predict.
+            The raw weighted sum then passes through a <span className="hl">sigmoid activation function</span>, which squashes it into a value between 0 and 1. This naturally <strong>bounds the prediction</strong> — the network can never predict a negative price or an astronomically high one. Sigmoid is like a confidence meter: very negative inputs → near 0, very positive inputs → near 1, and the transition is a smooth S-curve.
           </div>
           <div className="explain">
-            The output is in "scaled" space (centered around zero), so we <strong>un-scale it</strong> back to real dollars by multiplying by the standard deviation of house prices and adding the mean price. This reverses the scaling we did at the start.
+            The sigmoid output is then <strong>scaled to real dollars</strong>: multiply by $380,000 (the price range) and add $100,000 (the minimum). So a sigmoid of 0.0 → $100K, sigmoid of 0.5 → $290K, sigmoid of 1.0 → $480K.
           </div>
           <div className="callout">
             <span className="lock-icon">&#128274;</span> <strong>Again — no learning is happening here.</strong> The weights are frozen. This is just multiplication and addition using the weights the network already learned. A single forward pass.
@@ -384,13 +388,19 @@ function App() {
               <span style={{ color: "#A78BFA" }}>{OUTPUT_BIAS.toFixed(2)}</span>
               <span style={{ color: "#64748B" }}>=</span>
               <span style={{ fontWeight: "bold", fontSize: 14, color: "#22D3EE" }}>{result.outputRaw.toFixed(4)}</span>
-              <span style={{ color: "#475569", fontSize: 11, marginLeft: 4 }}>(scaled)</span>
+              <span style={{ color: "#475569", fontSize: 11, marginLeft: 4 }}>(raw)</span>
+            </div>
+            <div style={{ fontSize: 13, color: "#94A3B8", marginBottom: 8 }}>
+              <strong style={{ color: "#CBD5E1" }}>Sigmoid:</strong>{" "}
+              σ(<span className="mono" style={{ color: "#22D3EE" }}>{result.outputRaw.toFixed(4)}</span>)
+              {" = "}
+              <span className="mono" style={{ color: "#14B8A6", fontWeight: "bold" }}>{result.outputSig.toFixed(4)}</span>
             </div>
             <div style={{ fontSize: 13, color: "#94A3B8" }}>
-              <strong style={{ color: "#CBD5E1" }}>Un-scale to dollars:</strong>{" "}
-              <span className="mono" style={{ color: "#22D3EE" }}>{result.outputRaw.toFixed(4)}</span>
-              {" × $"}{PRICE_STD.toLocaleString()}
-              {" + $"}{PRICE_MEAN.toLocaleString()}
+              <strong style={{ color: "#CBD5E1" }}>Scale to dollars:</strong>{" "}
+              <span className="mono" style={{ color: "#14B8A6" }}>{result.outputSig.toFixed(4)}</span>
+              {" × $"}{PRICE_SCALE.toLocaleString()}
+              {" + $"}{PRICE_OFFSET.toLocaleString()}
             </div>
           </div>
 
