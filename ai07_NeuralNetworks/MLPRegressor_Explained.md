@@ -138,9 +138,47 @@ After the update, every weight in the network has shifted slightly in the direct
 
 Everything described above — forward pass, loss calculation, backpropagation, and weight update — happens for one example or one small batch of examples. Then the next batch comes through. Then the next. When the network has seen every example in the training set once, that's one epoch.
 
-MLPRegressor defaults to a maximum of 200 epochs, meaning it can loop through all 100,000 houses up to 200 times. In practice, the network monitors the loss and stops early if it notices the loss has stopped improving. This is controlled by a parameter called tolerance — if the loss doesn't improve by at least a small amount for 10 consecutive epochs, training stops automatically.
+MLPRegressor defaults to a maximum of 200 epochs, meaning it can loop through all 100,000 houses up to 200 times. By default, the network monitors the *training* loss and stops if the loss doesn't improve by at least a small amount for 10 consecutive epochs (controlled by a parameter called `tol`). But that's a weak stopping signal — training loss almost always keeps drifting down even when the model has started memorizing noise.
 
-During training, you'd typically see the loss drop quickly at first, then gradually level off. Early epochs make big improvements because the weights start random and even rough corrections help a lot. Later epochs make smaller and smaller refinements as the weights approach their optimal values.
+There's a much better stopping signal that we get for free, and it's the centerpiece of how we'll actually train networks in this course: **early stopping with a validation set**.
+
+---
+
+## Step 9b: Validation Sets and Early Stopping — The Smarter Way to Stop
+
+When you set `early_stopping=True` on the regressor, scikit-learn changes the training loop in three important ways.
+
+First, before training starts, the regressor takes the data you handed it (your training set) and quietly carves off a slice — by default 10%, but configurable with `validation_fraction`. That slice becomes a **validation set**. The remaining 85-90% is what the weights actually train on. The validation slice is held out — the model never trains on it, never updates weights from it. It just gets graded on it after every epoch.
+
+Second, after every epoch, the model scores itself on the validation slice using R-squared (coefficient of determination). That score gets recorded in `validation_scores_`. The best score seen so far — and the weights that produced it — get cached in `best_validation_score_` and saved internally.
+
+Third, the stopping rule changes. Instead of watching training loss, the regressor watches the **validation score**. If the validation score doesn't improve for `n_iter_no_change` epochs in a row (default is 10, but you'll commonly raise this to 20 or 30 for a little more patience), training halts. Critically, the model then rolls back to the cached best weights — not the final weights, which by definition were worse.
+
+The whole reason this matters: training loss and validation score eventually disagree. Early in training, both improve together — the model is genuinely learning patterns that generalize. Late in training, the model starts memorizing quirks of the training data that don't exist in the validation data. You'll see training loss continue to fall while validation R-squared peaks and then *drops*. That divergence is overfitting in action, and it's the moment you want to stop.
+
+Without early stopping, you'd train for the full `max_iter` and hand back a worse model than the one you had hundreds of epochs ago. With early stopping, you halt close to the validation peak and roll back to it. You get the best version of the model without having to guess the right number of epochs.
+
+There's one piece of vocabulary worth being careful about: validation set vs test set. They're not the same thing.
+
+The **validation set** is carved out of the training data and used during training to make decisions — when to stop, which architecture to prefer, etc. The model interacts with it constantly. The **test set** is the one you set aside before any training started, and it stays in the vault until the very end when you produce your final report-card score. If you peek at the test set during training (or use it to pick architectures), you've contaminated it and your final score is no longer trustworthy.
+
+So the full data pipeline becomes a three-way split:
+
+```
+All Data
+   │
+   ├─► Test set (~20%)         [LOCKED — only opened for the final score]
+   │
+   └─► Training set (~80%)
+          │
+          ├─► Actual training (~85% of training)   [weights learn from this]
+          │
+          └─► Validation set (~15% of training)    [scored after every epoch]
+```
+
+In scikit-learn you only have to do the outer split (with `train_test_split`); the validation split happens automatically inside `fit` when `early_stopping=True`.
+
+During training, you'd typically see the training loss drop quickly at first, then gradually level off. The validation score climbs alongside it for a while, then plateaus. Sometimes it dips back down — that's the overfitting signature, and that's where early stopping triggers and rolls you back.
 
 ---
 
@@ -160,13 +198,15 @@ Let's trace the entire journey one more time from start to finish.
 
 You start with a dataset of 100,000 houses. Each house has four features and a target price. You scale the features so they're all on the same range. You split the data into a training set and a test set — the network learns from the training set and you evaluate it on the test set to see how well it generalizes.
 
-You create an MLPRegressor and call fit on the training data. Inside fit, the network initializes all weights randomly. Then the training loop begins.
+You create an MLPRegressor with `early_stopping=True` and call fit on the training data. Inside fit, the network first carves a small validation slice off the training data — that slice is set aside and the model never trains on it directly. Then the network initializes all weights randomly and the training loop begins.
 
 One house at a time, or one batch at a time, the data flows forward through the network. Input layer receives four scaled features. Hidden layer nodes each compute a weighted sum, add a bias, and pass the result through ReLU. Output node combines the hidden layer's outputs into a single predicted price.
 
-The loss function compares the prediction to the actual price. Backpropagation traces the error backward and computes a gradient for every weight. Gradient descent nudges every weight slightly in the direction that reduces the error. This cycle repeats for every batch, every epoch, until the loss converges or the maximum number of epochs is reached.
+The loss function compares the prediction to the actual price. Backpropagation traces the error backward and computes a gradient for every weight. Gradient descent nudges every weight slightly in the direction that reduces the error. This cycle repeats for every batch, every epoch.
 
-After training, you call predict on new houses and get estimated prices. The whole thing — from raw data to trained model to predictions — is captured in just a few lines of scikit-learn code, but underneath those few lines, all of these steps are happening.
+At the end of each epoch, the model scores itself on the validation slice. If the validation score keeps improving, training continues. If it stops improving for `n_iter_no_change` epochs in a row, training halts and the model rolls back to the best weights it ever saw. Either way, training also stops if the maximum number of epochs is reached.
+
+After training, you call predict on new houses (from the locked-away test set, or from genuinely new data) and get estimated prices. The whole thing — from raw data to trained model with automatic overfitting protection to predictions — is captured in just a few lines of scikit-learn code, but underneath those few lines, all of these steps are happening.
 
 ---
 
@@ -182,7 +222,21 @@ The solver parameter controls which optimization algorithm updates the weights. 
 
 The learning_rate_init parameter sets the starting learning rate. The default is 0.001. Smaller values mean slower but potentially more precise training. Larger values mean faster but potentially less stable training.
 
-The max_iter parameter is the maximum number of epochs. The default is 200. If the model hasn't converged by then, scikit-learn will warn you that it didn't finish training and you may need to increase this number.
+The max_iter parameter is the maximum number of epochs. The default is 200. If the model hasn't converged by then, scikit-learn will warn you that it didn't finish training and you may need to increase this number. When early stopping is on (recommended), max_iter is just an upper bound — the validation watchdog will usually halt training long before this cap.
+
+The early_stopping parameter (default False) turns on the validation-set stopping rule described in Step 9b. Setting `early_stopping=True` is the single most useful change you can make to your training setup: it prevents overfitting, eliminates the need to guess `max_iter`, and rolls back to the best weights automatically. In this course we always turn it on.
+
+The validation_fraction parameter controls how much of the training data gets held out for the validation watchdog when early stopping is enabled. The default is 0.1 (10%). We usually use 0.15. Smaller values give the model more data to train on but make the validation score noisier. Larger values give a more reliable validation signal but reduce training data.
+
+The n_iter_no_change parameter is the patience — how many epochs in a row the validation score is allowed to *not* improve before training halts. The default is 10. We typically raise this to 20 or 30 for a little more patience, since validation scores can wobble for a few epochs before genuinely plateauing.
+
+After fitting a model with early stopping enabled, four attributes are useful for diagnosis:
+- `model.n_iter_` tells you how many epochs actually ran (often much less than `max_iter`)
+- `model.best_validation_score_` is the best validation R-squared seen during training
+- `model.loss_curve_` is the per-epoch training loss (good for plotting)
+- `model.validation_scores_` is the per-epoch validation R-squared (good for plotting alongside the loss curve)
+
+Plotting `loss_curve_` and `validation_scores_` together on a twin-axis chart is the cleanest way to *see* training and overfitting unfold.
 
 ---
 

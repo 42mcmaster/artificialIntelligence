@@ -71,13 +71,87 @@ A neural network trains in cycles:
 1. **Forward Pass:** Make a prediction
 2. **Calculate Loss:** How wrong were we?
 3. **Backpropagation:** Trace error backwards, adjust weights
-4. **Repeat** for many epochs (full passes through data)
+4. **Check validation set:** Is the model still improving on data it didn't train on?
+5. **Repeat** for many epochs (full passes through data)
 
-It's like taking practice tests and learning from every mistake!
+It's like taking practice tests and learning from every mistake — and grading yourself on a separate quiz so you know when you've stopped getting better.
 
 ```
-Data → Network → Prediction → Compare → Adjust Weights → Repeat
+Data → Network → Prediction → Compare → Adjust Weights → Score on Validation → Repeat
 ```
+
+---
+
+# Train / Validation / Test Split
+
+We don't just split into train and test — we slice the **training** data one more time to get a **validation set**.
+
+```
+All Data
+   │
+   ├──► Test set (20%)              [LOCKED — only used at the very end]
+   │
+   └──► Training set (80%)
+            │
+            ├──► Actual training (~85% of training)   [weights learn from this]
+            │
+            └──► Validation set (~15% of training)    [scored after every epoch]
+```
+
+| Set | Used for | When |
+|-----|----------|------|
+| **Train** | Updating weights | Every iteration |
+| **Validation** | Checking for overfitting | After every iteration |
+| **Test** | Final report-card grade | Once, at the end |
+
+> The validation chunk comes from training data. Your test set stays untouched.
+
+---
+
+# Early Stopping: When to Quit Training
+
+Without early stopping, the network just trains until `max_iter`. Late in training it often starts memorizing noise — overfitting in action.
+
+**Early stopping** watches the validation score and halts when it stops improving:
+
+```python
+MLPRegressor(
+    max_iter=2000,            # generous upper bound
+    early_stopping=True,      # turn on the validation check
+    validation_fraction=0.15, # hold out 15% for validation
+    n_iter_no_change=20,      # patience: wait 20 epochs before quitting
+)
+```
+
+After fitting:
+
+- `model.n_iter_` — when training actually halted
+- `model.best_validation_score_` — best validation R² seen
+- `model.loss_curve_` and `model.validation_scores_` — for plotting
+
+Bonus: it **rolls back to the best weights**, not the final (worse) ones.
+
+---
+
+# Spotting Overfitting on the Loss Curve
+
+Plot training loss (lower = better) and validation R² (higher = better) together — divergence is the tell.
+
+```
+training loss            validation R²
+   │                          │     ────  best
+   │\                         │   /
+   │ \                        │  /
+   │  \                       │ /
+   │   \____                  │/             ← overfit zone:
+   │       \___               │\____           val score drops
+   │           \____          │     \___       while loss
+   └──────── iter             └──────── iter   keeps falling
+```
+
+- **Both plateau together** → converged, no more juice. Time to stop.
+- **Loss falling, val score still rising** → still learning. Keep going.
+- **Loss falling, val score *dropping* from its peak** → overfitting. Early stopping triggers here, then rolls back to the peak.
 
 ---
 

@@ -24,6 +24,9 @@
 18. **Activation** - The output of a neuron after applying the activation function
 19. **Gradient Descent** - Optimization algorithm that adjusts weights to minimize loss
 20. **Hidden Layer Sizes** - Parameter defining architecture (e.g., `(10, 5)` = two hidden layers with 10 and 5 neurons)
+21. **Validation Set** - A slice of the *training* data held out during training; the model is scored on it after every iteration but never trains on it. Lets us watch for overfitting in real time without touching the test set.
+22. **Early Stopping** - Automatically halts training when the validation score stops improving for a set number of iterations (`n_iter_no_change`). The model rolls back to the best weights it ever saw.
+23. **Train / Validation / Test Split** - The three-way partition of the data: train (weights learn), validation (overfitting watchdog during training), test (final report card, untouched until the end).
 
 ---
 
@@ -51,17 +54,28 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-# 4. CREATE MODEL
+# 4. CREATE MODEL with early stopping
 #    hidden_layer_sizes: (10, 5) means 2 hidden layers with 10 and 5 neurons
-#    max_iter: max training rounds (epochs)
+#    max_iter: upper bound on training rounds (epochs)
+#    early_stopping: hold out a validation chunk, watch it after each epoch
+#    validation_fraction: 15% of training data for the validation watchdog
+#    n_iter_no_change: stop if validation hasn't improved in 20 iterations
 model = MLPRegressor(
     hidden_layer_sizes=(10, 5),
-    max_iter=1000,
+    max_iter=2000,
+    early_stopping=True,
+    validation_fraction=0.15,
+    n_iter_no_change=20,
     random_state=42
 )
 
 # 5. TRAIN
 model.fit(X_train_scaled, y_train)
+# After fitting, useful diagnostics:
+#   model.n_iter_                  -> when training actually stopped
+#   model.best_validation_score_   -> best validation R² seen
+#   model.loss_curve_              -> training loss per iteration
+#   model.validation_scores_       -> validation R² per iteration
 
 # 6. EVALUATE
 predictions = model.predict(X_test_scaled)
@@ -110,11 +124,31 @@ print(f"Mean Absolute Error: {mae:.1f}")
 ✗ Simple categorical decisions (use Decision Tree)
 
 ### Avoiding Overfitting
-- Use a validation set (included in train_test_split)
-- Monitor training progress: does loss keep decreasing on unseen data?
-- Reduce layers/neurons if overfitting
-- Use `max_iter` to limit training
-- Increase test_size to use more data for validation
+- **Use early stopping** — set `early_stopping=True` and let scikit-learn carve out a validation chunk and halt training when the validation score plateaus. Cheapest, most effective fix.
+- Plot `model.loss_curve_` and `model.validation_scores_` together. If validation R² peaks and then drops while training loss keeps falling, that's overfitting.
+- Reduce layers/neurons if early stopping fires very early — that's a signal your network is too big for the data.
+- Always remember the **train / validation / test** split. Validation comes from training data; the test set stays in the vault until the end.
+
+### Train / Validation / Test in scikit-learn
+
+You don't have to manually split a third time — `early_stopping=True` does it for you:
+
+```python
+# Step 1: your normal train/test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+# Step 2: model with early stopping carves the validation set internally
+model = MLPRegressor(
+    early_stopping=True,
+    validation_fraction=0.15,   # 15% of X_train becomes validation
+    n_iter_no_change=20,
+)
+model.fit(X_train_scaled, y_train)
+```
+
+Effective layout:
+- 80% of original data → train (of which 85% trains, 15% validates)
+- 20% of original data → test (untouched until final scoring)
 
 ---
 
@@ -146,25 +180,46 @@ print(f"Mean Absolute Error: {mae:.1f}")
 
 7. **What's the difference between forward pass and backpropagation?** Forward: predict using current weights. Backprop: adjust weights using error.
 
-8. **How do you reduce overfitting?** Use fewer neurons, stop training earlier, use more training data, use validation set.
+8. **How do you reduce overfitting?** Use fewer neurons, stop training earlier (preferably with `early_stopping=True`), use more training data, watch a validation set during training.
+
+9. **What is a validation set, and how is it different from the test set?** A validation set is a chunk of the *training* data held out so we can score the model after each iteration during training. The test set is locked away and only used at the very end for the final report card. Validation is for *tuning*; test is for *grading*.
+
+10. **What does `early_stopping=True` do in MLPRegressor?** It tells scikit-learn to (a) hold out a small validation fraction of the training data, (b) score the model on it after each iteration, and (c) stop training when the validation score hasn't improved for `n_iter_no_change` iterations in a row. The model also rolls back to the best weights it ever saw, not the final ones.
 
 ---
 
 ## Common Parameter Configurations
 
+All recipes below use early stopping so `max_iter` is just an upper bound — the actual iteration count is decided by the validation watchdog.
+
 ### For Simple Problems (Weather Prediction)
 ```python
-MLPRegressor(hidden_layer_sizes=(10, 5), max_iter=500)
+MLPRegressor(
+    hidden_layer_sizes=(10, 5),
+    max_iter=2000,
+    early_stopping=True, validation_fraction=0.15, n_iter_no_change=20,
+    random_state=42,
+)
 ```
 
 ### For Medium Problems
 ```python
-MLPRegressor(hidden_layer_sizes=(50, 25, 10), max_iter=1000)
+MLPRegressor(
+    hidden_layer_sizes=(50, 25, 10),
+    max_iter=3000,
+    early_stopping=True, validation_fraction=0.15, n_iter_no_change=20,
+    random_state=42,
+)
 ```
 
 ### For Complex Problems
 ```python
-MLPRegressor(hidden_layer_sizes=(100, 50, 25), max_iter=2000)
+MLPRegressor(
+    hidden_layer_sizes=(100, 50, 25),
+    max_iter=5000,
+    early_stopping=True, validation_fraction=0.15, n_iter_no_change=30,
+    random_state=42,
+)
 ```
 
 ---
